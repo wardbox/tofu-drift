@@ -1,0 +1,24 @@
+{
+  "_source": "Cloud Carbon Footprint methodology, https://www.cloudcarbonfootprint.org/docs/methodology",
+  "pue": 1.135,
+  "storage_wh_per_tb_hour": {"ssd": 1.2, "hdd": 0.65},
+  "ebs_replication": 2,
+  "grid_kg_per_kwh": {
+    "us-east-1": 0.379069,
+    "us-east-2": 0.410608,
+    "us-west-1": 0.322167,
+    "us-west-2": 0.322167,
+    "ca-central-1": 0.00013,
+    "sa-east-1": 0.0617,
+    "eu-west-1": 0.2786,
+    "eu-west-2": 0.225,
+    "eu-west-3": 0.0511,
+    "eu-central-1": 0.338,
+    "eu-north-1": 0.0088,
+    "ap-south-1": 0.708,
+    "ap-southeast-1": 0.408,
+    "ap-southeast-2": 0.79,
+    "ap-northeast-1": 0.465,
+    "ap-northeast-2": 0.4156
+  }
+}
