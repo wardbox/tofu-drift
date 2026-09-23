@@ -36,9 +36,6 @@ func scanCmd() *cobra.Command {
 		Short: "Report drift, unmanaged and idle resources",
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			ctx := cmd.Context()
-			if ctx == nil {
-				ctx = context.Background()
-			}
 			var opts []func(*config.LoadOptions) error
 			if region != "" {
 				opts = append(opts, config.WithRegion(region))
@@ -73,15 +70,16 @@ func scanCmd() *cobra.Command {
 
 			scan := report.Scan{Region: cfg.Region, StateSource: source}
 			regions, accounts := state.Locations(managed)
-			if n := others(regions, scan.Region); scan.Region != "" && n != "" {
-				fmt.Fprintf(cmd.ErrOrStderr(), "notice: state references resources in regions not scanned (scanning %s): %s\n", scan.Region, n)
+			if list := countsExcept(regions, scan.Region); scan.Region != "" && list != "" {
+				fmt.Fprintf(cmd.ErrOrStderr(), "notice: state references resources in regions not scanned (scanning %s): %s\n", scan.Region, list)
 			}
-			// Only look up the caller when state has accounts to compare. A
-			// failed lookup skips the check; missing credentials surface later.
+			// Only look up the caller when state has accounts to compare.
 			if len(accounts) > 0 {
-				scan.Account, _ = callerAccount(ctx, cfg)
-				if n := others(accounts, scan.Account); scan.Account != "" && n != "" {
-					fmt.Fprintf(cmd.ErrOrStderr(), "warning: state ARNs belong to account %s, but credentials are for account %s\n", n, scan.Account)
+				scan.Account, err = callerAccount(ctx, cfg)
+				if err != nil {
+					fmt.Fprintf(cmd.ErrOrStderr(), "notice: skipping state account check, caller identity unavailable: %v\n", err)
+				} else if list := countsExcept(accounts, scan.Account); scan.Account != "" && list != "" {
+					fmt.Fprintf(cmd.ErrOrStderr(), "warning: state ARNs belong to account %s, but credentials are for account %s\n", list, scan.Account)
 				}
 			}
 
@@ -108,9 +106,9 @@ func scanCmd() *cobra.Command {
 	return cmd
 }
 
-// others formats the counts for every key except skip, sorted, as
+// countsExcept formats the counts for every key except skip, sorted, as
 // "k1 (n), k2 (n)"; empty when there are none.
-func others(counts map[string]int, skip string) string {
+func countsExcept(counts map[string]int, skip string) string {
 	var parts []string
 	for _, k := range slices.Sorted(maps.Keys(counts)) {
 		if k != skip {

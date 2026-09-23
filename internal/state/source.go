@@ -67,11 +67,9 @@ func (s *Source) Load(ctx context.Context, flag string) ([]Resource, string, err
 }
 
 func (s *Source) pull(ctx context.Context) ([]Resource, string, error) {
-	tf, err := filepath.Glob(filepath.Join(s.Dir, "*.tf"))
-	if err != nil {
-		return nil, "", err
-	}
-	if len(tf) == 0 {
+	tf, _ := filepath.Glob(filepath.Join(s.Dir, "*.tf"))
+	tfJSON, _ := filepath.Glob(filepath.Join(s.Dir, "*.tf.json"))
+	if len(tf)+len(tfJSON) == 0 {
 		return nil, "", errors.New("no .tf files in the current directory: run inside a root module, or pass --state <path|s3://bucket/key>")
 	}
 	for _, name := range []string{"tofu", "terraform"} {
