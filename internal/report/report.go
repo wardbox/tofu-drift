@@ -6,8 +6,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"sort"
 	"text/tabwriter"
+	"time"
 
+	"github.com/wardbox/tofu-drift/internal/carbon"
+	"github.com/wardbox/tofu-drift/internal/match"
+	"github.com/wardbox/tofu-drift/internal/pricing"
+	"github.com/wardbox/tofu-drift/internal/scan"
 	"github.com/wardbox/tofu-drift/internal/state"
 )
 
@@ -19,9 +25,7 @@ type Report struct {
 	Findings []Finding `json:"findings"`
 	Totals   Totals    `json:"totals"`
 
-	// Managed is the list of resources read from state. Not part of the JSON
-	// schema; used by the human renderer until scanners exist.
-	Managed []state.Resource `json:"-"`
+	managed match.Managed
 }
 
 type Scan struct {
@@ -55,7 +59,47 @@ type Totals struct {
 }
 
 func New(scan Scan, managed []state.Resource) *Report {
-	return &Report{Schema: Schema, Scan: scan, Findings: []Finding{}, Managed: managed}
+	return &Report{Schema: Schema, Scan: scan, Findings: []Finding{}, managed: match.Index(managed)}
+}
+
+// AddLive turns live resources into Unmanaged and Idle Findings, costs them
+// for the scanned region, and keeps Findings sorted by cost descending.
+func (r *Report) AddLive(live []scan.LiveResource, now time.Time) {
+	for _, l := range live {
+		addr := r.managed.Lookup(l.Type, l.Key)
+		if addr != "" && l.Idle == "" {
+			continue
+		}
+		f := Finding{
+			ID:        l.Key,
+			Address:   addr,
+			Type:      l.Type,
+			Name:      l.Name,
+			Unmanaged: addr == "",
+			USDMo:     pricing.Monthly(r.Scan.Region, l),
+			KgCO2Mo:   carbon.Monthly(r.Scan.Region, l),
+		}
+		if l.Idle != "" {
+			f.Idle = &l.Idle
+			r.Totals.IdleUSDMo += f.USDMo
+		}
+		if f.Unmanaged {
+			r.Totals.UnmanagedUSDMo += f.USDMo
+		}
+		if l.Created != nil {
+			days := float64(int(now.Sub(*l.Created).Hours() / 24))
+			f.AgeDays = &days
+		}
+		r.Totals.KgCO2Mo += f.KgCO2Mo
+		r.Findings = append(r.Findings, f)
+	}
+	sort.SliceStable(r.Findings, func(i, j int) bool {
+		a, b := r.Findings[i], r.Findings[j]
+		if a.USDMo != b.USDMo {
+			return a.USDMo > b.USDMo
+		}
+		return a.ID < b.ID
+	})
 }
 
 func (r *Report) WriteJSON(w io.Writer) error {
@@ -66,14 +110,42 @@ func (r *Report) WriteJSON(w io.Writer) error {
 
 func (r *Report) WriteTable(w io.Writer) error {
 	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(tw, "ADDRESS\tTYPE\tID")
-	for _, m := range r.Managed {
-		fmt.Fprintf(tw, "%s\t%s\t%s\n", m.Address, m.Type, m.ID)
+	fmt.Fprint(tw, "Drift\nADDRESS\tTYPE\tCHANGED\n")
+	fmt.Fprint(tw, "\nUnmanaged & idle\nTYPE\tID\tNAME\tSTATUS\tAGE\t$/MO\tkgCO₂/MO\n")
+	for _, f := range r.Findings {
+		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%.2f\t%.1f\n",
+			f.Type, f.ID, dash(f.Name), f.status(), age(f.AgeDays), f.USDMo, f.KgCO2Mo)
 	}
 	if err := tw.Flush(); err != nil {
 		return err
 	}
-	_, err := fmt.Fprintf(w, "\n%d managed resources · %d findings\nUnmanaged: $%.0f/mo · Idle: $%.0f/mo · ~%.1f kgCO₂/mo\n",
-		len(r.Managed), len(r.Findings), r.Totals.UnmanagedUSDMo, r.Totals.IdleUSDMo, r.Totals.KgCO2Mo)
+	_, err := fmt.Fprintf(w, "\nUnmanaged: $%.0f/mo · Idle: $%.0f/mo · ~%.1f kgCO₂/mo (≈ %.2f trans-Atlantic flights)\n",
+		r.Totals.UnmanagedUSDMo, r.Totals.IdleUSDMo, r.Totals.KgCO2Mo, carbon.Flights(r.Totals.KgCO2Mo))
 	return err
+}
+
+func (f Finding) status() string {
+	switch {
+	case f.Unmanaged && f.Idle != nil:
+		return "unmanaged+idle"
+	case f.Unmanaged:
+		return "unmanaged"
+	case f.Idle != nil:
+		return "idle"
+	}
+	return "drift"
+}
+
+func dash(s string) string {
+	if s == "" {
+		return "-"
+	}
+	return s
+}
+
+func age(days *float64) string {
+	if days == nil {
+		return "-"
+	}
+	return fmt.Sprintf("%.0fd", *days)
 }

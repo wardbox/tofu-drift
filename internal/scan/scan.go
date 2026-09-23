@@ -1,0 +1,33 @@
+// Package scan lists live AWS resources. One file per service, each
+// implementing Scanner against a narrow SDK client interface.
+package scan
+
+import (
+	"context"
+	"time"
+)
+
+// Scanner lists the live resources of one service in one region.
+type Scanner interface {
+	List(ctx context.Context) ([]LiveResource, error)
+	// Permissions are the read-only IAM actions List needs.
+	Permissions() []string
+}
+
+// LiveResource is one resource found in the account.
+type LiveResource struct {
+	// Type is the OpenTofu resource type, e.g. aws_ebs_volume.
+	Type string
+	// Key is the Match Key: the per-type canonical identifier, also the Finding ID.
+	Key     string
+	ARN     string
+	Name    string
+	Tags    map[string]string
+	Created *time.Time
+	// Idle is the idle reason, empty when the resource is in use.
+	Idle string
+
+	// Cost inputs.
+	Class  string // volume type, instance class, ...
+	SizeGB float64
+}

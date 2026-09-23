@@ -9,7 +9,27 @@ import (
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/wardbox/tofu-drift/internal/scan"
 )
+
+type fakeScanner []scan.LiveResource
+
+func (f fakeScanner) List(context.Context) ([]scan.LiveResource, error) { return f, nil }
+func (fakeScanner) Permissions() []string                               { return nil }
+
+// Tests never reach AWS: no live resources unless a test stubs some.
+func init() { stubbed(nil) }
+
+func stubbed(live []scan.LiveResource) {
+	newScanners = func(aws.Config) []scan.Scanner { return []scan.Scanner{fakeScanner(live)} }
+}
+
+// stubScanners makes the scan see live for the duration of a test.
+func stubScanners(t *testing.T, live ...scan.LiveResource) {
+	t.Helper()
+	stubbed(live)
+	t.Cleanup(func() { stubbed(nil) })
+}
 
 func runScan(t *testing.T, args ...string) (string, error) {
 	t.Helper()
@@ -26,6 +46,7 @@ func runScanStderr(t *testing.T, account string, args ...string) (string, string
 	callerAccount = func(context.Context, aws.Config) (string, error) { return account, nil }
 	t.Cleanup(func() { callerAccount = orig })
 	cmd := scanCmd()
+	cmd.SilenceUsage, cmd.SilenceErrors = true, true
 	var out, stderr bytes.Buffer
 	cmd.SetOut(&out)
 	cmd.SetErr(&stderr)
@@ -35,11 +56,18 @@ func runScanStderr(t *testing.T, account string, args ...string) (string, string
 }
 
 func TestScanTable(t *testing.T) {
+	stubScanners(t,
+		scan.LiveResource{Type: "aws_ebs_volume", Key: "vol-0aaa", Class: "gp3", SizeGB: 500}, // managed, in use
+		scan.LiveResource{Type: "aws_ebs_volume", Key: "vol-stray", Name: "scratch", Class: "gp3", SizeGB: 100, Idle: "unattached"},
+	)
 	out, err := runScan(t, "--state", "../../internal/state/testdata/v4.tfstate")
-	if err != nil {
-		t.Fatal(err)
+	if !errors.Is(err, errFindings) {
+		t.Fatalf("want errFindings, got %v", err)
 	}
-	for _, want := range []string{`module.storage.aws_ebs_volume.data["a"]`, "5 managed resources · 0 findings", "Unmanaged: $0/mo"} {
+	if strings.Contains(out, "vol-0aaa") {
+		t.Errorf("managed in-use volume reported:\n%s", out)
+	}
+	for _, want := range []string{"vol-stray", "scratch", "unmanaged+idle", "8.00", "Unmanaged: $8/mo · Idle: $8/mo"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("output missing %q:\n%s", want, out)
 		}
@@ -47,20 +75,22 @@ func TestScanTable(t *testing.T) {
 }
 
 func TestScanJSON(t *testing.T) {
+	stubScanners(t, scan.LiveResource{Type: "aws_ebs_volume", Key: "vol-stray", Class: "gp3", SizeGB: 100, Idle: "unattached"})
 	out, err := runScan(t, "--state", "../../internal/state/testdata/v4.tfstate", "--json")
-	if err != nil {
-		t.Fatal(err)
+	if !errors.Is(err, errFindings) {
+		t.Fatalf("want errFindings, got %v", err)
 	}
 	var got struct {
 		Schema   int               `json:"schema"`
 		Scan     map[string]string `json:"scan"`
-		Findings []any             `json:"findings"`
+		Findings []map[string]any  `json:"findings"`
 		Totals   map[string]float64
 	}
 	if err := json.Unmarshal([]byte(out), &got); err != nil {
 		t.Fatalf("invalid json: %v\n%s", err, out)
 	}
-	if got.Schema != 1 || got.Findings == nil || len(got.Findings) != 0 || got.Scan["state_source"] == "" {
+	if got.Schema != 1 || len(got.Findings) != 1 || got.Findings[0]["id"] != "vol-stray" || got.Findings[0]["idle"] != "unattached" ||
+		got.Scan["state_source"] == "" || got.Scan["region"] != "us-east-1" {
 		t.Errorf("unexpected report: %s", out)
 	}
 	for _, k := range []string{"unmanaged_usd_mo", "idle_usd_mo", "kgco2_mo"} {
