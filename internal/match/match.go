@@ -14,8 +14,10 @@ func attr(name string) func(map[string]any) string {
 	return func(a map[string]any) string { s, _ := a[name].(string); return s }
 }
 
+type key struct{ typ, matchKey string }
+
 // Managed maps type and Match Key to the state address.
-type Managed map[[2]string]string
+type Managed map[key]string
 
 // Index builds the Match Key index of the resources in state.
 func Index(rs []state.Resource) Managed {
@@ -23,7 +25,7 @@ func Index(rs []state.Resource) Managed {
 	for _, r := range rs {
 		if f, ok := keyFor[r.Type]; ok {
 			if k := f(r.Attributes); k != "" {
-				m[[2]string{r.Type, k}] = r.Address
+				m[key{r.Type, k}] = r.Address
 			}
 		}
 	}
@@ -31,4 +33,4 @@ func Index(rs []state.Resource) Managed {
 }
 
 // Lookup returns the state address for a live resource, or "" if Unmanaged.
-func (m Managed) Lookup(typ, key string) string { return m[[2]string{typ, key}] }
+func (m Managed) Lookup(typ, k string) string { return m[key{typ, k}] }

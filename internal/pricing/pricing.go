@@ -14,6 +14,7 @@ var ebsJSON []byte
 
 // ebs is USD per GB-month by region, then volume type. Refreshed at release
 // time by hack/pricing/. Unlisted regions fall back to us-east-1.
+// ponytail: hand-seeded for the common regions; #8 generates every region.
 var ebs map[string]map[string]float64
 
 func init() {
@@ -22,8 +23,8 @@ func init() {
 	}
 }
 
-// EBSRate is the USD per GB-month for a volume type in region.
-func EBSRate(region, class string) float64 {
+// ebsRate is the USD per GB-month for a volume type in region.
+func ebsRate(region, class string) float64 {
 	rates, ok := ebs[region]
 	if !ok {
 		rates = ebs["us-east-1"]
@@ -35,7 +36,7 @@ func EBSRate(region, class string) float64 {
 func Monthly(region string, r scan.LiveResource) float64 {
 	switch r.Type {
 	case "aws_ebs_volume":
-		return r.SizeGB * EBSRate(region, r.Class)
+		return r.SizeGB * ebsRate(region, r.Class)
 	}
 	return 0
 }
