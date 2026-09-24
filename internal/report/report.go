@@ -159,7 +159,7 @@ func (r *Report) WriteTable(w io.Writer) error {
 		if !f.Unmanaged && f.Idle == nil {
 			continue
 		}
-		usd :=fmt.Sprintf("%.2f", f.USDMo)
+		usd := fmt.Sprintf("%.2f", f.USDMo)
 		if f.Approx {
 			usd = "≈" + usd
 		}
