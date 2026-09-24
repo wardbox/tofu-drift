@@ -14,9 +14,12 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
+	"github.com/aws/aws-sdk-go-v2/service/elasticache"
 	elb "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancing"
 	elbv2 "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2"
+	"github.com/aws/aws-sdk-go-v2/service/rds"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
 	"github.com/spf13/cobra"
@@ -53,6 +56,11 @@ var newScanners = func(cfg aws.Config) []scan.Scanner {
 		scan.AMIs{Client: client},
 		scan.LoadBalancers{Client: elbv2.NewFromConfig(cfg)},
 		scan.ClassicLoadBalancers{Client: elb.NewFromConfig(cfg)},
+		scan.RDSInstances{Client: rds.NewFromConfig(cfg)},
+		scan.RDSSnapshots{Client: rds.NewFromConfig(cfg)},
+		scan.DynamoDBTables{Client: dynamodb.NewFromConfig(cfg)},
+		scan.ElastiCache{Client: elasticache.NewFromConfig(cfg)},
+		scan.S3Buckets{Client: s3.NewFromConfig(cfg)},
 	}
 }
 

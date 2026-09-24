@@ -23,8 +23,13 @@ If one service's calls are denied or take longer than 30 seconds, that service i
 | Subnet | `aws_subnet` | never | $0 |
 | Route table | `aws_route_table` | never | $0 |
 | Security group | `aws_security_group` | never | $0 |
+| RDS instance | `aws_db_instance`, `aws_rds_cluster_instance` | stopped | on-demand hourly × 730, ×2 for Multi-AZ; stopped: $0 |
+| RDS snapshot | `aws_db_snapshot` | never | $0 |
+| DynamoDB table | `aws_dynamodb_table` | never | $0, size unknown |
+| ElastiCache cluster | `aws_elasticache_cluster`, `aws_elasticache_replication_group` | never | node hourly × 730 × nodes |
+| S3 bucket | `aws_s3_bucket` | never | $0, size unknown |
 
-Resources another resource creates are folded into their parent's row: an instance's launch-time volumes and network interface, a NAT gateway's Elastic IPs and network interface, an AMI's snapshots. Network interfaces AWS services manage for themselves (load balancers, Lambda, RDS, VPC endpoints) are skipped. Load-balancer processing (LCU) and NAT data charges are not estimated.
+Resources another resource creates are folded into their parent's row: an instance's launch-time volumes and network interface, a NAT gateway's Elastic IPs and network interface, an AMI's snapshots, an RDS instance's automated snapshots. ElastiCache clusters in a replication group are one row for the group. Network interfaces AWS services manage for themselves (load balancers, Lambda, RDS, VPC endpoints) are skipped. Load-balancer processing (LCU) and NAT data charges are not estimated, nor is RDS storage, backup or snapshot storage. RDS is priced at MySQL rates and ElastiCache at Redis rates whatever the engine. S3 buckets are listed account-wide with no per-bucket calls, so their region shows as `global`; DynamoDB tables are not sized.
 
 ## Ignore Rules
 

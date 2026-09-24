@@ -44,6 +44,15 @@ func TestMonthlyEC2(t *testing.T) {
 	if got := Monthly("us-east-1", large); got != 0 {
 		t.Errorf("stopped: got %v", got)
 	}
+	// RDS and ElastiCache classes carry vCPUs too; every billed node counts.
+	for _, r := range []scan.LiveResource{
+		{Type: "aws_db_instance", Class: "db.t3.large", Nodes: 2},
+		{Type: "aws_elasticache_replication_group", Class: "cache.t3.medium", Nodes: 2},
+	} {
+		if got := Monthly("us-east-1", r); math.Abs(got-2*want) > 1e-9 {
+			t.Errorf("%s: got %v, want %v", r.Type, got, 2*want)
+		}
+	}
 }
 
 func TestFlights(t *testing.T) {

@@ -7,6 +7,29 @@ import (
 	"github.com/wardbox/tofu-drift/internal/scan"
 )
 
+func TestMonthlyData(t *testing.T) {
+	for _, tc := range []struct {
+		region string
+		r      scan.LiveResource
+		want   float64
+		approx bool
+	}{
+		{"us-east-1", scan.LiveResource{Type: "aws_db_instance", Class: "db.t3.micro"}, 0.017 * 730, false},
+		{"us-east-1", scan.LiveResource{Type: "aws_db_instance", Class: "db.t3.micro", Nodes: 2}, 2 * 0.017 * 730, false},
+		{"af-south-1", scan.LiveResource{Type: "aws_db_instance", Class: "db.t3.micro"}, 0.017 * 730, true},
+		{"us-east-1", scan.LiveResource{Type: "aws_db_instance", Class: "db.t3.micro", Stopped: true}, 0, false},
+		{"us-east-1", scan.LiveResource{Type: "aws_elasticache_cluster", Class: "cache.t3.micro", Nodes: 3}, 3 * 0.017 * 730, false},
+		{"af-south-1", scan.LiveResource{Type: "aws_elasticache_replication_group", Class: "cache.t3.micro", Nodes: 2}, 2 * 0.017 * 730, true},
+		{"us-east-1", scan.LiveResource{Type: "aws_s3_bucket"}, 0, false},
+		{"us-east-1", scan.LiveResource{Type: "aws_dynamodb_table"}, 0, false},
+	} {
+		got, approx := Monthly(tc.region, tc.r)
+		if math.Abs(got-tc.want) > 1e-9 || approx != tc.approx {
+			t.Errorf("%s %+v: got %v approx=%v, want %v approx=%v", tc.region, tc.r, got, approx, tc.want, tc.approx)
+		}
+	}
+}
+
 func TestMonthlyEBS(t *testing.T) {
 	vol := scan.LiveResource{Type: "aws_ebs_volume", Class: "gp3", SizeGB: 100}
 	for _, tc := range []struct {
@@ -100,6 +123,10 @@ func TestMath(t *testing.T) {
 		{"xx-nowhere-1", scan.LiveResource{Type: "aws_instance", Class: "t3.large"}, "t3.large $0.0832/h × 730 h = $60.74/mo (≈ us-east-1 price)"},
 		{"us-east-1", scan.LiveResource{Type: "aws_instance", Class: "t3.large", Stopped: true}, "t3.large stopped, no compute charge = $0.00/mo"},
 		{"us-east-1", scan.LiveResource{Type: "aws_security_group"}, "not priced = $0.00/mo"},
+		{"us-east-1", scan.LiveResource{Type: "aws_db_instance", Class: "db.t3.micro", Nodes: 2}, "db.t3.micro $0.017/h × 730 h × 2 nodes = $24.82/mo"},
+		{"af-south-1", scan.LiveResource{Type: "aws_elasticache_replication_group", Class: "cache.t3.micro", Nodes: 3}, "cache.t3.micro $0.017/h × 730 h × 3 nodes = $37.23/mo (≈ us-east-1 price)"},
+		{"us-east-1", scan.LiveResource{Type: "aws_db_instance", Class: "db.t3.micro", Stopped: true}, "db.t3.micro stopped, no compute charge = $0.00/mo"},
+		{"us-east-1", scan.LiveResource{Type: "aws_s3_bucket"}, "size unknown = $0.00/mo"},
 	} {
 		if got := Math(tc.region, tc.r); got != tc.want {
 			t.Errorf("%s %s: got %q, want %q", tc.region, tc.r.Type, got, tc.want)

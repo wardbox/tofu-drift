@@ -37,4 +37,12 @@ type LiveResource struct {
 	SizeGB float64
 	// Stopped instances cost no compute.
 	Stopped bool
+	// Nodes is how many instances of Class are billed (Multi-AZ standby,
+	// cache nodes); 0 means 1.
+	Nodes int
+
+	// Region overrides the scanned region, "global" for global services.
+	Region string
+	// Note is shown with the Finding, e.g. why its cost is $0.
+	Note string
 }

@@ -3,10 +3,10 @@
 package report
 
 import (
+	"cmp"
 	"encoding/json"
 	"fmt"
 	"io"
-	"cmp"
 	"maps"
 	"regexp"
 	"slices"
@@ -52,6 +52,7 @@ type Finding struct {
 	ID        string  `json:"id"`
 	Address   string  `json:"address"`
 	Type      string  `json:"type"`
+	Region    string  `json:"region,omitempty"`
 	Name      string  `json:"name"`
 	Drift     *Drift  `json:"drift"`
 	Unmanaged bool    `json:"unmanaged"`
@@ -61,6 +62,7 @@ type Finding struct {
 	Approx  bool     `json:"usd_mo_approx,omitempty"`
 	KgCO2Mo float64  `json:"kgco2_mo"`
 	AgeDays *float64 `json:"age_days"`
+	Note    string   `json:"note,omitempty"`
 }
 
 type Drift struct {
@@ -75,7 +77,7 @@ type Totals struct {
 }
 
 func New(meta Scan, managed []state.Resource) *Report {
-	return &Report{Schema: Schema, Scan: meta,Findings: []Finding{}, managed: match.Index(managed),
+	return &Report{Schema: Schema, Scan: meta, Findings: []Finding{}, managed: match.Index(managed),
 		live: map[string]scan.LiveResource{}, drifts: map[string]plan.Drift{}}
 }
 
@@ -84,12 +86,20 @@ func New(meta Scan, managed []state.Resource) *Report {
 // Derived Resources are never rows; their cost rolls up into their parent.
 func (r *Report) AddLive(live []scan.LiveResource, now time.Time) {
 	roots := match.Roots(live)
+	// Costs are keyed by type and Match Key: names like "app" repeat across types.
+	parentType := map[string]string{}
+	for _, l := range live {
+		if len(l.Derived) > 0 {
+			parentType[l.Key] = l.Type
+		}
+	}
 	usd, kg, approx := map[string]float64{}, map[string]float64{}, map[string]bool{}
 	for _, l := range live {
-		r.live[l.Key] = l
-		root, ok := roots[l.Key]
-		if !ok {
-			root = l.Key
+		// By type and key for Findings, by key alone for Derived lookups.
+		r.live[l.Type+" "+l.Key], r.live[l.Key] = l, l
+		root := l.Type + " " + l.Key
+		if p, ok := roots[l.Key]; ok {
+			root = parentType[p] + " " + p
 		}
 		u, a := pricing.Monthly(r.Scan.Region, l)
 		usd[root] += u
@@ -104,15 +114,18 @@ func (r *Report) AddLive(live []scan.LiveResource, now time.Time) {
 		if addr != "" && l.Idle == "" || r.Ignore != nil && r.Ignore(l) {
 			continue
 		}
+		k := l.Type + " " + l.Key
 		f := Finding{
 			ID:        l.Key,
 			Address:   addr,
 			Type:      l.Type,
+			Region:    cmp.Or(l.Region, r.Scan.Region),
 			Name:      l.Name,
 			Unmanaged: addr == "",
-			USDMo:     usd[l.Key],
-			Approx:    approx[l.Key],
-			KgCO2Mo:   kg[l.Key],
+			USDMo:     usd[k],
+			Approx:    approx[k],
+			KgCO2Mo:   kg[k],
+			Note:      l.Note,
 		}
 		if l.Idle != "" {
 			f.Idle = &l.Idle
@@ -171,7 +184,7 @@ func ageRank(f Finding) int {
 func (r *Report) AddDrift(drifts []plan.Drift) {
 	for _, d := range drifts {
 		r.drifts[d.Address] = d
-		drift :=&Drift{Changed: d.Changed(), Deleted: d.Deleted}
+		drift := &Drift{Changed: d.Changed(), Deleted: d.Deleted}
 		i := slices.IndexFunc(r.Findings, func(f Finding) bool { return f.Address == d.Address })
 		if i >= 0 {
 			r.Findings[i].Drift = drift
@@ -204,7 +217,7 @@ func (r *Report) writeTable(w io.Writer, withDrift bool) error {
 		}
 		fmt.Fprint(tw, "\n")
 	}
-	fmt.Fprint(tw, "Unmanaged & idle\nTYPE\tID\tNAME\tSTATUS\tAGE\t$/MO\tkgCO₂/MO\n")
+	fmt.Fprint(tw, "Unmanaged & idle\nTYPE\tID\tREGION\tNAME\tSTATUS\tAGE\t$/MO\tkgCO₂/MO\tNOTE\n")
 	for _, f := range r.Findings {
 		if !f.Unmanaged && f.Idle == nil {
 			continue
@@ -213,8 +226,8 @@ func (r *Report) writeTable(w io.Writer, withDrift bool) error {
 		if f.Approx {
 			usd = "≈" + usd
 		}
-		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\t%.1f\n",
-			f.Type, f.ID, dash(f.Name), f.status(), age(f.AgeDays), usd, f.KgCO2Mo)
+		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%.1f\t%s\n",
+			f.Type, f.ID, f.Region, dash(f.Name), f.status(), age(f.AgeDays), usd, f.KgCO2Mo, dash(f.Note))
 	}
 	if err := tw.Flush(); err != nil {
 		return err
@@ -273,7 +286,8 @@ func (r *Report) Explain(w io.Writer, id string) bool {
 	if i < 0 {
 		return false
 	}
-	f, l := r.Findings[i], r.live[id]
+	f := r.Findings[i]
+	l := r.live[f.Type+" "+id]
 	var tags []string
 	for _, k := range slices.Sorted(maps.Keys(l.Tags)) {
 		tags = append(tags, k+"="+l.Tags[k])

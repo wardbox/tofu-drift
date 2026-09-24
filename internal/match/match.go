@@ -31,6 +31,14 @@ var keyFor = map[string]func(attrs map[string]any) string{
 	"aws_ami":                    attr("id"),
 	"aws_ami_copy":               attr("id"),
 	"aws_ami_from_instance":      attr("id"),
+
+	"aws_db_instance":                   attr("identifier"),
+	"aws_rds_cluster_instance":          attr("identifier"),
+	"aws_db_snapshot":                   attr("db_snapshot_identifier"),
+	"aws_dynamodb_table":                attr("name"),
+	"aws_elasticache_cluster":           attr("cluster_id"),
+	"aws_elasticache_replication_group": attr("replication_group_id"),
+	"aws_s3_bucket":                     attr("bucket"),
 }
 
 // liveType maps state types that adopt AWS-made resources, or are aliases or
@@ -44,6 +52,7 @@ var liveType = map[string]string{
 	"aws_default_subnet":         "aws_subnet",
 	"aws_default_route_table":    "aws_route_table",
 	"aws_default_security_group": "aws_security_group",
+	"aws_rds_cluster_instance":   "aws_db_instance",
 }
 
 func attr(name string) func(map[string]any) string {

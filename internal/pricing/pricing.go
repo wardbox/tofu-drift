@@ -114,12 +114,21 @@ func estimate(region string, r scan.LiveResource) (usd float64, approx bool, bas
 		return perHour(r.Class+" ", rate(flat, region, lbRate[r.Class]), false)
 	case "aws_elb":
 		return perHour("", rate(flat, region, "clb_hour"), false)
-	case "aws_instance":
+	case "aws_s3_bucket", "aws_dynamodb_table":
+		return 0, false, "size unknown"
+	case "aws_instance", "aws_db_instance", "aws_elasticache_cluster", "aws_elasticache_replication_group":
 		if r.Stopped {
 			return 0, false, r.Class + " stopped, no compute charge"
 		}
 		h, approx := hourly(region, r.Class)
-		return perHour(r.Class+" ", h, approx)
+		usd, approx, basis := perHour(r.Class+" ", h, approx)
+		if n := Nodes(r); n > 1 {
+			return usd * float64(n), approx, fmt.Sprintf("%s × %d nodes", basis, n)
+		}
+		return usd, approx, basis
 	}
 	return 0, false, "not priced"
 }
+
+// Nodes is how many instances of r's class are billed.
+func Nodes(r scan.LiveResource) int { return max(r.Nodes, 1) }
