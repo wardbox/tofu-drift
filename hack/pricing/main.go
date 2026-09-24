@@ -27,7 +27,7 @@ var regions = []string{
 
 const offerURL = "https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/%s/current/%s/index.csv"
 
-const dir = "internal/pricing/"
+const outDir = "internal/pricing/"
 
 func main() {
 	t := newTables()
@@ -43,13 +43,13 @@ func main() {
 			}
 		}
 	}
-	if err := writeJSON(dir+"instances.json", t); err != nil {
+	if err := writeJSON(outDir+"instances.json", t); err != nil {
 		log.Fatal(err)
 	}
 	// ebs.json covers more regions and types than the offer files (io2 is
 	// absent from them); refresh what we fetched, keep the rest.
 	ebs := map[string]map[string]float64{}
-	b, err := os.ReadFile(dir + "ebs.json")
+	b, err := os.ReadFile(outDir + "ebs.json")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -62,7 +62,7 @@ func main() {
 		}
 		maps.Copy(ebs[region], rates)
 	}
-	if err := writeJSON(dir+"ebs.json", ebs); err != nil {
+	if err := writeJSON(outDir+"ebs.json", ebs); err != nil {
 		log.Fatal(err)
 	}
 }

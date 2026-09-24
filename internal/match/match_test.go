@@ -3,8 +3,21 @@ package match
 import (
 	"testing"
 
+	"github.com/wardbox/tofu-drift/internal/scan"
 	"github.com/wardbox/tofu-drift/internal/state"
 )
+
+func TestRoots(t *testing.T) {
+	roots := Roots([]scan.LiveResource{
+		{Key: "asg-1", Derived: []string{"i-1"}},
+		{Key: "i-1", Derived: []string{"vol-1"}},
+		{Key: "vol-1"},
+		{Key: "vol-2"},
+	})
+	if roots["vol-1"] != "asg-1" || roots["i-1"] != "asg-1" || len(roots) != 2 {
+		t.Errorf("roots: %v", roots)
+	}
+}
 
 func TestIndex(t *testing.T) {
 	idx := Index([]state.Resource{

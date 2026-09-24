@@ -30,8 +30,6 @@ func init() {
 // kgPerFlight is one passenger's one-way trans-Atlantic flight.
 const kgPerFlight = 750
 
-const hoursPerMonth = 730
-
 // Flights expresses kg of CO₂ as trans-Atlantic flights.
 func Flights(kg float64) float64 { return kg / kgPerFlight }
 
@@ -51,14 +49,14 @@ func Monthly(region string, r scan.LiveResource) float64 {
 			return 0
 		}
 		watts := float64(pricing.VCPU(r.Class)) * (coef.ComputeWatts.Min + coef.ComputeWatts.Max) / 2
-		return watts * hoursPerMonth * coef.PUE / 1000 * grid(region)
+		return watts * pricing.HoursPerMonth * coef.PUE / 1000 * grid(region)
 	case "aws_ebs_volume":
 		disk := "ssd"
 		switch r.Class {
 		case "st1", "sc1", "standard":
 			disk = "hdd"
 		}
-		kwh := r.SizeGB / 1000 * hoursPerMonth * coef.StorageWh[disk] * coef.EBSReplication * coef.PUE / 1000
+		kwh := r.SizeGB / 1000 * pricing.HoursPerMonth * coef.StorageWh[disk] * coef.EBSReplication * coef.PUE / 1000
 		return kwh * grid(region)
 	}
 	return 0

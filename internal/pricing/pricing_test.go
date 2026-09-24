@@ -47,7 +47,7 @@ func TestMonthlyEC2(t *testing.T) {
 	stopped := large
 	stopped.Stopped = true
 	if got, _ := Monthly("us-east-1", stopped); got != 0 {
-		t.Errorf("stopped instance bills no compute: %v", got)
+		t.Errorf("stopped instance costs no compute: %v", got)
 	}
 	if VCPU("t3.large") != 2 || VCPU("db.t3.large") != 2 || VCPU("cache.t3.medium") != 2 {
 		t.Errorf("vcpu: %d %d %d", VCPU("t3.large"), VCPU("db.t3.large"), VCPU("cache.t3.medium"))

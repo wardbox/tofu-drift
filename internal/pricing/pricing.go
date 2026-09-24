@@ -28,7 +28,8 @@ var instances struct {
 	Hourly map[string]map[string]float64 `json:"hourly"`
 }
 
-const hoursPerMonth = 730
+// HoursPerMonth turns hourly rates and power into monthly figures.
+const HoursPerMonth = 730
 
 func init() {
 	if err := json.Unmarshal(ebsJSON, &ebs); err != nil {
@@ -73,7 +74,7 @@ func Monthly(region string, r scan.LiveResource) (usd float64, approx bool) {
 			return 0, false
 		}
 		h, approx := hourly(region, r.Class)
-		return h * hoursPerMonth, approx
+		return h * HoursPerMonth, approx
 	}
 	return 0, false
 }

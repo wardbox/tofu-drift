@@ -8,8 +8,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
 )
 
-// EC2 lists EC2 instances. Attached EBS volumes are Derived Resources: a
-// stopped instance costs only its volumes.
+// EC2 lists EC2 instances. EBS volumes created with the instance are Derived
+// Resources: a stopped instance costs only those volumes.
 type EC2 struct {
 	Client ec2.DescribeInstancesAPIClient
 }
@@ -44,7 +44,9 @@ func (s EC2) List(ctx context.Context) ([]LiveResource, error) {
 					Stopped: state == types.InstanceStateNameStopped || state == types.InstanceStateNameStopping,
 				}
 				for _, b := range i.BlockDeviceMappings {
-					if b.Ebs != nil {
+					// Only volumes created with the instance are Derived; ones
+					// attached later stand alone and are matched on their own.
+					if b.Ebs != nil && aws.ToBool(b.Ebs.DeleteOnTermination) {
 						r.Derived = append(r.Derived, aws.ToString(b.Ebs.VolumeId))
 					}
 				}

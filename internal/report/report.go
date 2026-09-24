@@ -68,31 +68,26 @@ func New(scan Scan, managed []state.Resource) *Report {
 // for the scanned region, and keeps Findings sorted by cost descending.
 // Derived Resources are never rows; their cost rolls up into their parent.
 func (r *Report) AddLive(live []scan.LiveResource, now time.Time) {
-	parent := map[string]string{}
+	roots := match.Roots(live)
+	usd, kg, approx := map[string]float64{}, map[string]float64{}, map[string]bool{}
 	for _, l := range live {
-		for _, d := range l.Derived {
-			parent[d] = l.Key
+		root, ok := roots[l.Key]
+		if !ok {
+			root = l.Key
 		}
-	}
-	usd, kg := map[string]float64{}, map[string]float64{}
-	for _, l := range live {
-		root := l.Key
-		for p, ok := parent[root]; ok; p, ok = parent[root] {
-			root = p
-		}
-		u, _ := pricing.Monthly(r.Scan.Region, l)
+		u, a := pricing.Monthly(r.Scan.Region, l)
 		usd[root] += u
+		approx[root] = approx[root] || a
 		kg[root] += carbon.Monthly(r.Scan.Region, l)
 	}
 	for _, l := range live {
-		if _, derived := parent[l.Key]; derived {
+		if _, derived := roots[l.Key]; derived {
 			continue
 		}
 		addr := r.managed.Lookup(l.Type, l.Key)
 		if addr != "" && l.Idle == "" {
 			continue
 		}
-		_, approx := pricing.Monthly(r.Scan.Region, l)
 		f := Finding{
 			ID:        l.Key,
 			Address:   addr,
@@ -100,7 +95,7 @@ func (r *Report) AddLive(live []scan.LiveResource, now time.Time) {
 			Name:      l.Name,
 			Unmanaged: addr == "",
 			USDMo:     usd[l.Key],
-			Approx:    approx,
+			Approx:    approx[l.Key],
 			KgCO2Mo:   kg[l.Key],
 		}
 		if l.Idle != "" {

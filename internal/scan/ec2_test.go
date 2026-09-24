@@ -26,15 +26,24 @@ func instance(id string, state types.InstanceStateName, volumes ...string) types
 	}
 	for _, v := range volumes {
 		i.BlockDeviceMappings = append(i.BlockDeviceMappings, types.InstanceBlockDeviceMapping{
-			Ebs: &types.EbsInstanceBlockDevice{VolumeId: aws.String(v)},
+			Ebs: &types.EbsInstanceBlockDevice{VolumeId: aws.String(v), DeleteOnTermination: aws.Bool(true)},
 		})
 	}
 	return i
 }
 
+// attach adds a volume attached after launch, which outlives the instance.
+func attach(i types.Instance, volume string) types.Instance {
+	i.BlockDeviceMappings = append(i.BlockDeviceMappings, types.InstanceBlockDeviceMapping{
+		Ebs: &types.EbsInstanceBlockDevice{VolumeId: aws.String(volume), DeleteOnTermination: aws.Bool(false)},
+	})
+	return i
+}
+
 func TestEC2List(t *testing.T) {
 	launched := time.Date(2026, 1, 2, 0, 0, 0, 0, time.UTC)
-	web := instance("i-web", types.InstanceStateNameRunning, "vol-root", "vol-data")
+	// vol-extra was attached by hand: not Derived, reported on its own.
+	web := attach(instance("i-web", types.InstanceStateNameRunning, "vol-root", "vol-data"), "vol-extra")
 	web.LaunchTime = &launched
 	web.Tags = []types.Tag{{Key: aws.String("Name"), Value: aws.String("web")}}
 	client := fakeInstances{
@@ -70,6 +79,6 @@ func TestEC2List(t *testing.T) {
 		t.Errorf("stopped: %+v", off)
 	}
 	if !stopping.Stopped {
-		t.Errorf("stopping bills like stopped: %+v", stopping)
+		t.Errorf("stopping costs like stopped: %+v", stopping)
 	}
 }

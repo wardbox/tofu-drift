@@ -32,6 +32,6 @@ type LiveResource struct {
 	// Cost inputs.
 	Class  string // volume type, instance class, ...
 	SizeGB float64
-	// Stopped instances bill no compute.
+	// Stopped instances cost no compute.
 	Stopped bool
 }

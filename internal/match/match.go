@@ -2,7 +2,10 @@
 // equality only.
 package match
 
-import "github.com/wardbox/tofu-drift/internal/state"
+import (
+	"github.com/wardbox/tofu-drift/internal/scan"
+	"github.com/wardbox/tofu-drift/internal/state"
+)
 
 // keyFor maps a state resource type to its Match Key, derived from state
 // attributes. Types absent here are ignored.
@@ -31,6 +34,26 @@ func Index(rs []state.Resource) Managed {
 		}
 	}
 	return m
+}
+
+// Roots maps the key of every Derived Resource in live to the key of its
+// top-level parent, the one resource it is folded into.
+func Roots(live []scan.LiveResource) map[string]string {
+	parent := map[string]string{}
+	for _, l := range live {
+		for _, d := range l.Derived {
+			parent[d] = l.Key
+		}
+	}
+	roots := make(map[string]string, len(parent))
+	for d := range parent {
+		root := d
+		for p, ok := parent[root]; ok; p, ok = parent[root] {
+			root = p
+		}
+		roots[d] = root
+	}
+	return roots
 }
 
 // Lookup returns the state address for a live resource, or "" if Unmanaged.
