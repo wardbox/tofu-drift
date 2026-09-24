@@ -258,6 +258,7 @@ func (p *pipeline) run(cmd *cobra.Command, withDrift bool) (*report.Report, erro
 	r.Ignore = conf.Ignored
 	r.AddLive(live, time.Now())
 	r.AddDrift(drifts)
+	r.DriftChecked = withDrift && p.statePath == ""
 	return r, nil
 }
 

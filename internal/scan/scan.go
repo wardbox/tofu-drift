@@ -34,8 +34,10 @@ type LiveResource struct {
 	Default bool
 
 	// Cost inputs.
-	Class  string // volume type, instance class, ...
+	Class  string // volume type, instance class, RDS snapshot type, ...
 	SizeGB float64
+	// Storage is an RDS instance's storage type (gp3, io1, aurora, ...).
+	Storage string
 	// Stopped instances cost no compute.
 	Stopped bool
 	// Nodes is how many instances of Class are billed (Multi-AZ standby,

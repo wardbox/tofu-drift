@@ -26,10 +26,13 @@ import (
 const Schema = 1
 
 type Report struct {
-	Schema   int       `json:"schema"`
-	Scan     Scan      `json:"scan"`
-	Findings []Finding `json:"findings"`
-	Totals   Totals    `json:"totals"`
+	Schema int `json:"schema"`
+	// DriftChecked is true when a refresh-only plan ran; false when drift
+	// detection was skipped, so an empty Drift list proves nothing.
+	DriftChecked bool      `json:"drift_checked"`
+	Scan         Scan      `json:"scan"`
+	Findings     []Finding `json:"findings"`
+	Totals       Totals    `json:"totals"`
 
 	// Ignore, when set, drops the Unmanaged and Idle Finding of every live
 	// resource it matches (Ignore Rules). Drift is never ignored.

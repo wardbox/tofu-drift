@@ -31,7 +31,7 @@ func TestUnmanaged(t *testing.T) {
 	if out, _, _ = runCmd(t, unmanagedCmd(), "", "--state", v4State); strings.Index(out, "i-stray") > strings.Index(out, "vol-stray") {
 		t.Errorf("default sort is cost:\n%s", out)
 	}
-	if out, _, _ = runCmd(t, unmanagedCmd(), "", "--state", v4State, "--json"); !strings.Contains(out, `"id": "vol-stray"`) {
+	if out, _, _ = runCmd(t, unmanagedCmd(), "", "--state", v4State, "--json"); !strings.Contains(out, `"id": "vol-stray"`) || !strings.Contains(out, `"drift_checked": false`) {
 		t.Errorf("--json:\n%s", out)
 	}
 	if _, _, err := runCmd(t, unmanagedCmd(), "", "--state", v4State, "--sort", "size"); err == nil || errors.Is(err, errFindings) {

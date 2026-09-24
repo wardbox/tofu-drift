@@ -6,6 +6,12 @@
     "log_storage_gb_month": 0.033,
     "nat_gateway_hour": 0.062,
     "nlb_hour": 0.0243,
+    "rds_backup_gb_month": 0.095,
+    "rds_gp2_gb_month": 0.138,
+    "rds_gp3_gb_month": 0.138,
+    "rds_io1_gb_month": 0.15,
+    "rds_io2_gb_month": 0.15,
+    "rds_standard_gb_month": 0.12,
     "snapshot_gb_month": 0.05
   },
   "ap-northeast-2": {
@@ -15,6 +21,12 @@
     "log_storage_gb_month": 0.0314,
     "nat_gateway_hour": 0.059,
     "nlb_hour": 0.0225,
+    "rds_backup_gb_month": 0.095,
+    "rds_gp2_gb_month": 0.131,
+    "rds_gp3_gb_month": 0.131,
+    "rds_io1_gb_month": 0.142,
+    "rds_io2_gb_month": 0.142,
+    "rds_standard_gb_month": 0.114,
     "snapshot_gb_month": 0.05
   },
   "ap-south-1": {
@@ -24,6 +36,12 @@
     "log_storage_gb_month": 0.0306,
     "nat_gateway_hour": 0.056,
     "nlb_hour": 0.0239,
+    "rds_backup_gb_month": 0.095,
+    "rds_gp2_gb_month": 0.131,
+    "rds_gp3_gb_month": 0.131,
+    "rds_io1_gb_month": 0.142,
+    "rds_io2_gb_month": 0.142,
+    "rds_standard_gb_month": 0.114,
     "snapshot_gb_month": 0.05
   },
   "ap-southeast-1": {
@@ -33,6 +51,12 @@
     "log_storage_gb_month": 0.033,
     "nat_gateway_hour": 0.059,
     "nlb_hour": 0.0252,
+    "rds_backup_gb_month": 0.095,
+    "rds_gp2_gb_month": 0.138,
+    "rds_gp3_gb_month": 0.138,
+    "rds_io1_gb_month": 0.15,
+    "rds_io2_gb_month": 0.15,
+    "rds_standard_gb_month": 0.12,
     "snapshot_gb_month": 0.05
   },
   "ap-southeast-2": {
@@ -42,6 +66,12 @@
     "log_storage_gb_month": 0.033,
     "nat_gateway_hour": 0.059,
     "nlb_hour": 0.0252,
+    "rds_backup_gb_month": 0.095,
+    "rds_gp2_gb_month": 0.138,
+    "rds_gp3_gb_month": 0.138,
+    "rds_io1_gb_month": 0.15,
+    "rds_io2_gb_month": 0.15,
+    "rds_standard_gb_month": 0.12,
     "snapshot_gb_month": 0.055
   },
   "ca-central-1": {
@@ -51,6 +81,12 @@
     "log_storage_gb_month": 0.033,
     "nat_gateway_hour": 0.05,
     "nlb_hour": 0.02475,
+    "rds_backup_gb_month": 0.095,
+    "rds_gp2_gb_month": 0.127,
+    "rds_gp3_gb_month": 0.127,
+    "rds_io1_gb_month": 0.138,
+    "rds_io2_gb_month": 0.138,
+    "rds_standard_gb_month": 0.11,
     "snapshot_gb_month": 0.055
   },
   "eu-central-1": {
@@ -60,6 +96,12 @@
     "log_storage_gb_month": 0.0324,
     "nat_gateway_hour": 0.052,
     "nlb_hour": 0.027,
+    "rds_backup_gb_month": 0.095,
+    "rds_gp2_gb_month": 0.137,
+    "rds_gp3_gb_month": 0.137,
+    "rds_io1_gb_month": 0.149,
+    "rds_io2_gb_month": 0.149,
+    "rds_standard_gb_month": 0.119,
     "snapshot_gb_month": 0.054
   },
   "eu-north-1": {
@@ -69,6 +111,12 @@
     "log_storage_gb_month": 0.0315,
     "nat_gateway_hour": 0.046,
     "nlb_hour": 0.02394,
+    "rds_backup_gb_month": 0.095,
+    "rds_gp2_gb_month": 0.121,
+    "rds_gp3_gb_month": 0.121,
+    "rds_io1_gb_month": 0.132,
+    "rds_io2_gb_month": 0.132,
+    "rds_standard_gb_month": 0.105,
     "snapshot_gb_month": 0.0475
   },
   "eu-west-1": {
@@ -78,6 +126,12 @@
     "log_storage_gb_month": 0.03,
     "nat_gateway_hour": 0.048,
     "nlb_hour": 0.0252,
+    "rds_backup_gb_month": 0.095,
+    "rds_gp2_gb_month": 0.127,
+    "rds_gp3_gb_month": 0.127,
+    "rds_io1_gb_month": 0.138,
+    "rds_io2_gb_month": 0.138,
+    "rds_standard_gb_month": 0.11,
     "snapshot_gb_month": 0.05
   },
   "eu-west-2": {
@@ -87,6 +141,12 @@
     "log_storage_gb_month": 0.0315,
     "nat_gateway_hour": 0.05,
     "nlb_hour": 0.02646,
+    "rds_backup_gb_month": 0.095,
+    "rds_gp2_gb_month": 0.133,
+    "rds_gp3_gb_month": 0.133,
+    "rds_io1_gb_month": 0.145,
+    "rds_io2_gb_month": 0.145,
+    "rds_standard_gb_month": 0.116,
     "snapshot_gb_month": 0.053
   },
   "eu-west-3": {
@@ -96,6 +156,12 @@
     "log_storage_gb_month": 0.0315,
     "nat_gateway_hour": 0.05,
     "nlb_hour": 0.02646,
+    "rds_backup_gb_month": 0.095,
+    "rds_gp2_gb_month": 0.133,
+    "rds_gp3_gb_month": 0.133,
+    "rds_io1_gb_month": 0.145,
+    "rds_io2_gb_month": 0.145,
+    "rds_standard_gb_month": 0.116,
     "snapshot_gb_month": 0.053
   },
   "sa-east-1": {
@@ -105,6 +171,12 @@
     "log_storage_gb_month": 0.0408,
     "nat_gateway_hour": 0.093,
     "nlb_hour": 0.034,
+    "rds_backup_gb_month": 0.095,
+    "rds_gp2_gb_month": 0.219,
+    "rds_gp3_gb_month": 0.219,
+    "rds_io1_gb_month": 0.238,
+    "rds_io2_gb_month": 0.238,
+    "rds_standard_gb_month": 0.19,
     "snapshot_gb_month": 0.068
   },
   "us-east-1": {
@@ -114,6 +186,12 @@
     "log_storage_gb_month": 0.03,
     "nat_gateway_hour": 0.045,
     "nlb_hour": 0.0225,
+    "rds_backup_gb_month": 0.095,
+    "rds_gp2_gb_month": 0.115,
+    "rds_gp3_gb_month": 0.115,
+    "rds_io1_gb_month": 0.125,
+    "rds_io2_gb_month": 0.125,
+    "rds_standard_gb_month": 0.1,
     "snapshot_gb_month": 0.05
   },
   "us-east-2": {
@@ -123,6 +201,12 @@
     "log_storage_gb_month": 0.03,
     "nat_gateway_hour": 0.045,
     "nlb_hour": 0.0225,
+    "rds_backup_gb_month": 0.095,
+    "rds_gp2_gb_month": 0.115,
+    "rds_gp3_gb_month": 0.115,
+    "rds_io1_gb_month": 0.125,
+    "rds_io2_gb_month": 0.125,
+    "rds_standard_gb_month": 0.1,
     "snapshot_gb_month": 0.05
   },
   "us-west-1": {
@@ -132,6 +216,12 @@
     "log_storage_gb_month": 0.03,
     "nat_gateway_hour": 0.048,
     "nlb_hour": 0.0252,
+    "rds_backup_gb_month": 0.095,
+    "rds_gp2_gb_month": 0.138,
+    "rds_gp3_gb_month": 0.138,
+    "rds_io1_gb_month": 0.15,
+    "rds_io2_gb_month": 0.15,
+    "rds_standard_gb_month": 0.12,
     "snapshot_gb_month": 0.055
   },
   "us-west-2": {
@@ -141,6 +231,12 @@
     "log_storage_gb_month": 0.03,
     "nat_gateway_hour": 0.045,
     "nlb_hour": 0.0225,
+    "rds_backup_gb_month": 0.095,
+    "rds_gp2_gb_month": 0.115,
+    "rds_gp3_gb_month": 0.115,
+    "rds_io1_gb_month": 0.125,
+    "rds_io2_gb_month": 0.125,
+    "rds_standard_gb_month": 0.1,
     "snapshot_gb_month": 0.05
   }
 }

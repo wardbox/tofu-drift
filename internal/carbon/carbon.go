@@ -44,12 +44,22 @@ func grid(region string) float64 {
 // Monthly is the kgCO₂/mo Estimate for r in region; 0 for plumbing types.
 func Monthly(region string, r scan.LiveResource) float64 {
 	switch r.Type {
-	case "aws_instance", "aws_db_instance", "aws_elasticache_cluster", "aws_elasticache_replication_group":
-		if r.Stopped {
+	case "aws_db_snapshot":
+		if r.Class == "automated" { // folded into its instance, free up to DB size
 			return 0
 		}
+		return storage(region, "hdd", r.SizeGB)
+	case "aws_instance", "aws_db_instance", "aws_elasticache_cluster", "aws_elasticache_replication_group":
+		var disk float64
+		if r.Type == "aws_db_instance" {
+			// RDS storage is SSD like EBS, stopped or not, once per Multi-AZ copy.
+			disk = storage(region, "ssd", r.SizeGB*float64(pricing.Nodes(r)))
+		}
+		if r.Stopped {
+			return disk
+		}
 		watts := float64(pricing.VCPU(r.Class)*pricing.Nodes(r)) * (coef.ComputeWatts.Min + coef.ComputeWatts.Max) / 2
-		return watts * pricing.HoursPerMonth * coef.PUE / 1000 * grid(region)
+		return disk + watts*pricing.HoursPerMonth*coef.PUE/1000*grid(region)
 	case "aws_ebs_volume":
 		disk := "ssd"
 		switch r.Class {

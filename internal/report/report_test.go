@@ -128,10 +128,11 @@ func TestAddLiveData(t *testing.T) {
 	r := New(Scan{Region: "us-east-1"}, nil)
 	r.AddLive([]scan.LiveResource{
 		// Same Match Key on different types: separate rows, separate costs.
-		{Type: "aws_db_instance", Key: "app", Class: "db.t3.micro", Derived: []string{"rds:app-1"}},
-		{Type: "aws_db_snapshot", Key: "rds:app-1", SizeGB: 20},
+		{Type: "aws_db_instance", Key: "app", Class: "db.t3.micro", Storage: "gp3", SizeGB: 20, Derived: []string{"rds:app-1"}},
+		{Type: "aws_db_snapshot", Key: "rds:app-1", Class: "automated", SizeGB: 20},
+		{Type: "aws_db_snapshot", Key: "before-upgrade", Class: "manual", SizeGB: 20},
 		{Type: "aws_elasticache_cluster", Key: "app", Class: "cache.t3.micro", Nodes: 2},
-		{Type: "aws_db_instance", Key: "old", Class: "db.t3.micro", Stopped: true, Idle: "stopped"},
+		{Type: "aws_db_instance", Key: "old", Class: "db.t3.micro", Storage: "gp3", SizeGB: 20, Stopped: true, Idle: "stopped"},
 		{Type: "aws_s3_bucket", Key: "logs", Region: "global", Note: "size unknown"},
 	}, time.Now())
 
@@ -143,24 +144,34 @@ func TestAddLiveData(t *testing.T) {
 ADDRESS  TYPE  CHANGED
 
 Unmanaged & idle
-TYPE                     ID    REGION     NAME  STATUS          AGE  $/MO   kgCO₂/MO  NOTE
-aws_elasticache_cluster  app   us-east-1  -     unmanaged       -    24.82  2.7       -
-aws_db_instance          app   us-east-1  -     unmanaged       -    12.41  1.3       -
-aws_s3_bucket            logs  global     -     unmanaged       -    0.00   0.0       size unknown
-aws_db_instance          old   us-east-1  -     unmanaged+idle  -    0.00   0.0       -
+TYPE                     ID              REGION     NAME  STATUS          AGE  $/MO   kgCO₂/MO  NOTE
+aws_elasticache_cluster  app             us-east-1  -     unmanaged       -    24.82  2.7       -
+aws_db_instance          app             us-east-1  -     unmanaged       -    14.71  1.3       -
+aws_db_instance          old             us-east-1  -     unmanaged+idle  -    2.30   0.0       -
+aws_db_snapshot          before-upgrade  us-east-1  -     unmanaged       -    1.90   0.0       -
+aws_s3_bucket            logs            global     -     unmanaged       -    0.00   0.0       size unknown
 
-Unmanaged: $37/mo · Idle: $0/mo · ~4.0 kgCO₂/mo (≈ 0.01 trans-Atlantic flights)
+Unmanaged: $44/mo · Idle: $2/mo · ~4.0 kgCO₂/mo (≈ 0.01 trans-Atlantic flights)
 `
 	if out.String() != want {
 		t.Errorf("table:\n%s\nwant:\n%s", out.String(), want)
 	}
-	if s3 := r.Findings[2]; s3.Region != "global" || s3.Note != "size unknown" {
+	if s3 := r.Findings[4];s3.Region != "global" || s3.Note != "size unknown" {
 		t.Errorf("s3: %+v", s3)
 	}
 	// --explain app shows the first row, with that row's own resource.
 	out.Reset()
 	if !r.Explain(&out, "app") || !strings.Contains(out.String(), "cost:     cache.t3.micro $0.017/h × 730 h × 2 nodes = $24.82/mo\n") {
 		t.Errorf("explain:\n%s", out.String())
+	}
+	for id, want := range map[string]string{
+		"old":            "cost:     db.t3.micro stopped, no compute charge + gp3 20 GB × $0.115/GB-mo = $2.30/mo\n",
+		"before-upgrade": "cost:     snapshot 20 GB × $0.095/GB-mo = $1.90/mo\n",
+	} {
+		out.Reset()
+		if !r.Explain(&out, id) || !strings.Contains(out.String(), want) {
+			t.Errorf("explain %s:\n%s\nwant line %q", id, out.String(), want)
+		}
 	}
 }
 

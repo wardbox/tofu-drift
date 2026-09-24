@@ -43,18 +43,22 @@ If one service's calls are denied or take longer than 30 seconds, that service i
 | Subnet | `aws_subnet` | never | $0 |
 | Route table | `aws_route_table` | never | $0 |
 | Security group | `aws_security_group` | never | $0 |
-| RDS instance | `aws_db_instance`, `aws_rds_cluster_instance` | stopped | on-demand hourly × 730, ×2 for Multi-AZ; stopped: $0 |
-| RDS snapshot | `aws_db_snapshot` | never | $0 |
+| RDS instance | `aws_db_instance`, `aws_rds_cluster_instance` | stopped | on-demand hourly × 730 plus allocated GB × storage-type rate, both ×2 for Multi-AZ; stopped: storage only |
+| RDS snapshot | `aws_db_snapshot` | never | allocated GB × backup storage rate; automated snapshots $0 (free up to the DB size) |
 | DynamoDB table | `aws_dynamodb_table` | never | $0, size unknown |
 | ElastiCache cluster | `aws_elasticache_cluster`, `aws_elasticache_replication_group` | never | node hourly × 730 × nodes |
 | S3 bucket | `aws_s3_bucket` | never | $0, size unknown |
 | IAM role (global) | `aws_iam_role` | never | $0 |
 | IAM user (global) | `aws_iam_user` | never | $0 |
-| Route53 hosted zone (global) | `aws_route53_zone` | never | $0 |
+| Route53 hosted zone (global) | `aws_route53_zone` | never | $0.50 per zone |
 | Lambda function | `aws_lambda_function` | never | its `/aws/lambda/<name>` log group |
 | CloudWatch log group | `aws_cloudwatch_log_group` | never | stored GB × log storage rate; NOTE says `retention never` when unset |
 
-Resources another resource creates are folded into their parent's row: an instance's launch-time volumes and network interface, a NAT gateway's Elastic IPs and network interface, an AMI's snapshots, an RDS instance's automated snapshots, an Auto Scaling group's instances, an EKS cluster's security group, control-plane and VPC CNI network interfaces, nodegroup Auto Scaling groups and nodes (found by the `eks:cluster-name` tag), and a Lambda function's `/aws/lambda/<name>` log group. When the parent is managed, these never appear. ElastiCache clusters in a replication group are one row for the group. IAM and Route53 are global and scanned whatever the region. Service-linked IAM roles, like the default VPC, are only reported with `--include-defaults`. Network interfaces AWS services manage for themselves (load balancers, Lambda, RDS, VPC endpoints) are skipped. Load-balancer processing (LCU) and NAT data charges are not estimated, nor is RDS storage, backup or snapshot storage. RDS is priced at MySQL rates and ElastiCache at Redis rates whatever the engine. S3 buckets are listed account-wide with no per-bucket calls, so their region shows as `global`; DynamoDB tables are not sized.
+Resources another resource creates are folded into their parent's row: an instance's launch-time volumes and network interface, a NAT gateway's Elastic IPs and network interface, an AMI's snapshots, an RDS instance's automated snapshots, an Auto Scaling group's instances, an EKS cluster's security group, control-plane and VPC CNI network interfaces, nodegroup Auto Scaling groups and nodes (found by the `eks:cluster-name` tag), and a Lambda function's `/aws/lambda/<name>` log group. When the parent is managed, these never appear. ElastiCache clusters in a replication group are one row for the group. IAM and Route53 are global and scanned whatever the region. Service-linked IAM roles, like the default VPC, are only reported with `--include-defaults`. Network interfaces AWS services manage for themselves (load balancers, Lambda, RDS, VPC endpoints) are skipped. Load-balancer processing (LCU) and NAT data charges are not estimated, nor are RDS provisioned IOPS, Aurora storage, or Route53 queries. RDS is priced at MySQL rates and ElastiCache at Redis rates whatever the engine. S3 buckets are listed account-wide with no per-bucket calls, so their region shows as `global`; DynamoDB tables are not sized.
+
+## JSON
+
+`--json` emits the report shape in [`docs/spec.md`](docs/spec.md) (§2). Its top-level `drift_checked` is `true` when the refresh-only plan ran and `false` when drift detection was skipped (`--state` given, or the `unmanaged` command), so an empty drift list only means "no drift" when it is `true`.
 
 ## Ignore Rules
 
@@ -76,4 +80,4 @@ arn = "arn:aws:iam::*:role/legacy-*"  # path.Match glob: * does not cross /
 Every $/mo and kgCO₂/mo figure is an estimate, meant for ranking rather than billing.
 
 - **Cost** comes from static on-demand tables embedded in the binary and refreshed at release time by [`hack/pricing/`](hack/pricing/README.md). Nothing is queried live. Reserved instances and savings plans are ignored, so committed-use discounts are not reflected. A running instance costs its on-demand hourly rate × 730 plus its volumes; a stopped instance costs only the EBS volumes created with it. Those volumes are folded into the instance's row; volumes attached later get their own rows. Instance prices exist for ten regions; any other region uses the us-east-1 price, shown with `≈`.
-- **Carbon** follows the [Cloud Carbon Footprint methodology](https://www.cloudcarbonfootprint.org/docs/methodology): compute is vCPU × the midpoint of CCF's AWS min/max watts per vCPU × 730 h × PUE × regional grid intensity; storage is TB-hours × CCF's SSD/HDD coefficient, with snapshots and log groups counted as HDD. Network is ignored, so Elastic IPs, NAT gateways, network interfaces and load balancers carry no carbon. Coefficients live in `internal/carbon/carbon.json`.
+- **Carbon** follows the [Cloud Carbon Footprint methodology](https://www.cloudcarbonfootprint.org/docs/methodology): compute is vCPU × the midpoint of CCF's AWS min/max watts per vCPU × 730 h × PUE × regional grid intensity; storage is TB-hours × CCF's SSD/HDD coefficient, with RDS storage counted as SSD and snapshots and log groups as HDD. Network is ignored, so Elastic IPs, NAT gateways, network interfaces and load balancers carry no carbon. Coefficients live in `internal/carbon/carbon.json`.

@@ -31,6 +31,7 @@ Every run ends with the footer line. First run with no credentials prints the re
 ```json
 {
   "schema": 1,
+  "drift_checked": true,
   "scan": {"account": "", "region": "", "state_source": ""},
   "findings": [{
     "id": "", "address": "", "type": "", "name": "",
@@ -41,7 +42,7 @@ Every run ends with the footer line. First run with no credentials prints the re
 }
 ```
 
-A drifted Finding's `drift` is `{"changed": ["attr", ...]}`, plus `"deleted": true` when the resource was deleted out of band. Attribute values never appear in `--json`; `--explain` is the only place they are shown, with sensitive ones masked.
+`drift_checked` is true when the refresh-only plan ran, false when drift detection was skipped (`--state` given, or `unmanaged`); additive, so no `schema` bump. A drifted Finding's `drift` is `{"changed": ["attr", ...]}`, plus `"deleted": true` when the resource was deleted out of band. Attribute values never appear in `--json`; `--explain` is the only place they are shown, with sensitive ones masked.
 
 **Cut from v0.1:** destroy-plan (liability), multi-state scanning, multi-region, HTTP state backend (`tofu state pull` covers it in-repo), CloudWatch-metric idleness, rightsizing/"oversized" detection, `--fail-on`, `--binary` override.
 
@@ -80,7 +81,7 @@ Chosen for waste-likelihood × small-team ubiquity. Published as a hand-written 
 
 **Cost:** static pricing table shipped in the binary, refreshed at release time by `hack/pricing/` from the AWS Pricing API — never queried live. Flat rates (NAT hourly, EBS per GB, EIP, ALB hourly, snapshot per GB) for all regions. Instance-class tables (EC2, RDS, ElastiCache) for us-east-1, us-east-2, us-west-2, eu-west-1, eu-west-2, eu-central-1, ap-southeast-1, ap-southeast-2, ap-northeast-1, ca-central-1; other regions use the us-east-1 price marked `≈` (`usd_mo_approx`, omitted when false, in `--json`).
 
-Cost basis: running instance = on-demand hourly × 730 plus its Derived EBS volumes; stopped instance = those volumes only; EBS and snapshots = GB × rate (snapshots at full size); log groups = `storedBytes` from DescribeLogGroups; S3 = $0 with note "size unknown"; Lambda, IAM, SG, VPC, subnet, route table = $0. Reserved instances and savings plans ignored. Everything labeled "estimated"; ranking matters more than precision.
+Cost basis: running instance = on-demand hourly × 730 plus its Derived EBS volumes; stopped instance = those volumes only; RDS instance = on-demand hourly × 730 plus allocated GB × storage-type rate (gp2/gp3/io1/io2/standard), both ×2 for Multi-AZ, storage still billed when stopped; EBS and snapshots = GB × rate (snapshots at full size), manual RDS snapshots at allocated GB × the RDS backup storage rate, automated RDS snapshots $0 (folded into their instance, free up to the DB size); Route53 hosted zone = $0.50/mo; log groups = `storedBytes` from DescribeLogGroups; S3 = $0 with note "size unknown"; Lambda, IAM, SG, VPC, subnet, route table = $0. Reserved instances and savings plans ignored. Everything labeled "estimated"; ranking matters more than precision.
 
 **Carbon:** Cloud Carbon Footprint methodology. Compute = vCPU × average watts (midpoint of CCF min/max) × 730 h × PUE × regional grid intensity; storage = TB-hours × CCF coefficient; network ignored; plumbing = 0. vCPU counts come from the instance-type table already needed for pricing. Coefficients and grid intensities shipped as JSON in `internal/carbon/`, CCF cited in the README. One decimal, clearly labeled estimate. All figures monthly.
 
