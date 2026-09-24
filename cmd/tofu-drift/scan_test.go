@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/spf13/cobra"
 	"github.com/wardbox/tofu-drift/internal/scan"
 )
 
@@ -47,12 +48,17 @@ func runScan(t *testing.T, args ...string) (string, error) {
 // runScanStderr runs scan in us-east-1 with STS stubbed to return account.
 func runScanStderr(t *testing.T, account string, args ...string) (string, string, error) {
 	t.Helper()
+	return runCmd(t, scanCmd(), account, args...)
+}
+
+// runCmd runs cmd in us-east-1 with STS stubbed to return account.
+func runCmd(t *testing.T, cmd *cobra.Command, account string, args ...string) (string, string, error) {
+	t.Helper()
 	t.Setenv("AWS_REGION", "us-east-1")
 	t.Setenv("AWS_CONFIG_FILE", "/nonexistent")
 	orig := callerAccount
 	callerAccount = func(context.Context, aws.Config) (string, error) { return account, nil }
 	t.Cleanup(func() { callerAccount = orig })
-	cmd := scanCmd()
 	cmd.SilenceUsage, cmd.SilenceErrors = true, true
 	var out, stderr bytes.Buffer
 	cmd.SetOut(&out)

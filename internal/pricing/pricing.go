@@ -6,6 +6,7 @@ package pricing
 import (
 	_ "embed"
 	"encoding/json"
+	"fmt"
 
 	"github.com/wardbox/tofu-drift/internal/scan"
 )
@@ -79,25 +80,46 @@ func VCPU(class string) int { return instances.VCPU[class] }
 // Monthly is the USD/mo Estimate for r in region; 0 for unpriced types.
 // approx is true when the region has no price table and us-east-1 was used.
 func Monthly(region string, r scan.LiveResource) (usd float64, approx bool) {
+	usd, approx, _ = estimate(region, r)
+	return usd, approx
+}
+
+// Math is the cost math behind Monthly, e.g. "gp3 100 GB × $0.08/GB-mo = $8.00/mo".
+func Math(region string, r scan.LiveResource) string {
+	usd, approx, basis := estimate(region, r)
+	s := fmt.Sprintf("%s = $%.2f/mo", basis, usd)
+	if approx {
+		s += " (≈ us-east-1 price)"
+	}
+	return s
+}
+
+func estimate(region string, r scan.LiveResource) (usd float64, approx bool, basis string) {
+	perGB := func(prefix string, rate float64) (float64, bool, string) {
+		return r.SizeGB * rate, false, fmt.Sprintf("%s%g GB × $%g/GB-mo", prefix, r.SizeGB, rate)
+	}
+	perHour := func(prefix string, rate float64, approx bool) (float64, bool, string) {
+		return rate * HoursPerMonth, approx, fmt.Sprintf("%s$%g/h × %d h", prefix, rate, HoursPerMonth)
+	}
 	switch r.Type {
 	case "aws_ebs_volume":
-		return r.SizeGB * rate(ebs, region, r.Class), false
+		return perGB(r.Class+" ", rate(ebs, region, r.Class))
 	case "aws_ebs_snapshot":
-		return r.SizeGB * rate(flat, region, "snapshot_gb_month"), false
+		return perGB("", rate(flat, region, "snapshot_gb_month"))
 	case "aws_eip":
-		return rate(flat, region, "eip_hour") * HoursPerMonth, false
+		return perHour("", rate(flat, region, "eip_hour"), false)
 	case "aws_nat_gateway":
-		return rate(flat, region, "nat_gateway_hour") * HoursPerMonth, false
+		return perHour("", rate(flat, region, "nat_gateway_hour"), false)
 	case "aws_lb":
-		return rate(flat, region, lbRate[r.Class]) * HoursPerMonth, false
+		return perHour(r.Class+" ", rate(flat, region, lbRate[r.Class]), false)
 	case "aws_elb":
-		return rate(flat, region, "clb_hour") * HoursPerMonth, false
+		return perHour("", rate(flat, region, "clb_hour"), false)
 	case "aws_instance":
 		if r.Stopped {
-			return 0, false
+			return 0, false, r.Class + " stopped, no compute charge"
 		}
 		h, approx := hourly(region, r.Class)
-		return h * HoursPerMonth, approx
+		return perHour(r.Class+" ", h, approx)
 	}
-	return 0, false
+	return 0, false, "not priced"
 }
