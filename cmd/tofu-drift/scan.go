@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	awshttp "github.com/aws/aws-sdk-go-v2/aws/transport/http"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/autoscaling"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
@@ -124,6 +125,24 @@ func listAll(ctx context.Context, w io.Writer, scanners []scan.Scanner) ([]scan.
 	return all, nil
 }
 
+// getState reads s3://bucket/key. A state bucket often lives outside the scan
+// region; S3 then answers with the bucket's region in X-Amz-Bucket-Region and
+// the read is retried once there.
+func getState(ctx context.Context, c *s3.Client, bucket, key string) (io.ReadCloser, error) {
+	in := &s3.GetObjectInput{Bucket: &bucket, Key: &key}
+	out, err := c.GetObject(ctx, in)
+	var re *awshttp.ResponseError
+	if errors.As(err, &re) && re.Response != nil {
+		if region := re.Response.Header.Get("X-Amz-Bucket-Region"); region != "" {
+			out, err = c.GetObject(ctx, in, func(o *s3.Options) { o.Region = region })
+		}
+	}
+	if err != nil {
+		return nil, err
+	}
+	return out.Body, nil
+}
+
 // retrieveCredentials fails when cfg has no usable AWS credentials. Swapped in tests.
 var retrieveCredentials = func(ctx context.Context, cfg aws.Config) error {
 	_, err := cfg.Credentials.Retrieve(ctx)
@@ -187,11 +206,7 @@ func (p *pipeline) run(cmd *cobra.Command, withDrift bool) (*report.Report, erro
 		LookPath: lookPath,
 		Run:      runTool,
 		GetS3: func(ctx context.Context, bucket, key string) (io.ReadCloser, error) {
-			out, err := s3.NewFromConfig(cfg).GetObject(ctx, &s3.GetObjectInput{Bucket: &bucket, Key: &key})
-			if err != nil {
-				return nil, err
-			}
-			return out.Body, nil
+			return getState(ctx, s3.NewFromConfig(cfg), bucket, key)
 		},
 	}
 	managed, source, err := src.Load(ctx, p.statePath)
