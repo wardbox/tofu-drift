@@ -1,0 +1,28 @@
+{
+  "TargetGroups": [
+    {
+      "TargetGroupArn": "arn:aws:elasticloadbalancing:us-west-1:123456789012:targetgroup/tdsbx-tg/b3486d95889e8ca4",
+      "TargetGroupName": "tdsbx-tg",
+      "Protocol": "HTTP",
+      "Port": 80,
+      "VpcId": "vpc-06477faef5ba8c81b",
+      "HealthCheckProtocol": "HTTP",
+      "HealthCheckPort": "traffic-port",
+      "HealthCheckEnabled": true,
+      "HealthCheckIntervalSeconds": 30,
+      "HealthCheckTimeoutSeconds": 5,
+      "HealthyThresholdCount": 5,
+      "UnhealthyThresholdCount": 2,
+      "HealthCheckPath": "/",
+      "Matcher": {
+        "HttpCode": "200"
+      },
+      "LoadBalancerArns": [
+        "arn:aws:elasticloadbalancing:us-west-1:123456789012:loadbalancer/app/tdsbx-alb/a0fb401e97734c75"
+      ],
+      "TargetType": "instance",
+      "ProtocolVersion": "HTTP1",
+      "IpAddressType": "ipv4"
+    }
+  ]
+}

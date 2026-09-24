@@ -1,0 +1,28 @@
+{
+  "logGroups": [
+    {
+      "logGroupName": "/aws/lambda/tdsbx-fn",
+      "creationTime": 1790221946103,
+      "retentionInDays": 1,
+      "metricFilterCount": 0,
+      "arn": "arn:aws:logs:us-west-1:123456789012:log-group:/aws/lambda/tdsbx-fn:*",
+      "storedBytes": 0,
+      "logGroupClass": "STANDARD",
+      "logGroupArn": "arn:aws:logs:us-west-1:123456789012:log-group:/aws/lambda/tdsbx-fn",
+      "deletionProtectionEnabled": false,
+      "bearerTokenAuthenticationEnabled": false
+    },
+    {
+      "logGroupName": "tdsbx-app",
+      "creationTime": 1790221946101,
+      "retentionInDays": 7,
+      "metricFilterCount": 0,
+      "arn": "arn:aws:logs:us-west-1:123456789012:log-group:tdsbx-app:*",
+      "storedBytes": 0,
+      "logGroupClass": "STANDARD",
+      "logGroupArn": "arn:aws:logs:us-west-1:123456789012:log-group:tdsbx-app",
+      "deletionProtectionEnabled": false,
+      "bearerTokenAuthenticationEnabled": false
+    }
+  ]
+}

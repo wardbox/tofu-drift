@@ -1,0 +1,99 @@
+{
+  "SecurityGroups": [
+    {
+      "GroupId": "sg-022de9ab87e61375e",
+      "IpPermissionsEgress": [
+        {
+          "IpProtocol": "-1",
+          "UserIdGroupPairs": [],
+          "IpRanges": [
+            {
+              "CidrIp": "0.0.0.0/0"
+            }
+          ],
+          "Ipv6Ranges": [],
+          "PrefixListIds": []
+        }
+      ],
+      "VpcId": "vpc-06477faef5ba8c81b",
+      "SecurityGroupArn": "arn:aws:ec2:us-west-1:123456789012:security-group/sg-022de9ab87e61375e",
+      "OwnerId": "123456789012",
+      "GroupName": "default",
+      "Description": "default VPC security group",
+      "IpPermissions": [
+        {
+          "IpProtocol": "-1",
+          "UserIdGroupPairs": [
+            {
+              "UserId": "123456789012",
+              "GroupId": "sg-022de9ab87e61375e"
+            }
+          ],
+          "IpRanges": [],
+          "Ipv6Ranges": [],
+          "PrefixListIds": []
+        }
+      ]
+    },
+    {
+      "GroupId": "sg-02650871c4b541c45",
+      "IpPermissionsEgress": [
+        {
+          "IpProtocol": "-1",
+          "UserIdGroupPairs": [],
+          "IpRanges": [
+            {
+              "CidrIp": "0.0.0.0/0"
+            }
+          ],
+          "Ipv6Ranges": [],
+          "PrefixListIds": []
+        }
+      ],
+      "Tags": [
+        {
+          "Key": "Name",
+          "Value": "tdsbx-sg"
+        },
+        {
+          "Key": "tofu-drift-sandbox",
+          "Value": "tdsbx"
+        }
+      ],
+      "VpcId": "vpc-06477faef5ba8c81b",
+      "SecurityGroupArn": "arn:aws:ec2:us-west-1:123456789012:security-group/sg-02650871c4b541c45",
+      "OwnerId": "123456789012",
+      "GroupName": "tdsbx-sg",
+      "Description": "tofu-drift sandbox",
+      "IpPermissions": [
+        {
+          "IpProtocol": "tcp",
+          "FromPort": 80,
+          "ToPort": 80,
+          "UserIdGroupPairs": [],
+          "IpRanges": [
+            {
+              "Description": "HTTP inside the VPC",
+              "CidrIp": "10.42.0.0/16"
+            }
+          ],
+          "Ipv6Ranges": [],
+          "PrefixListIds": []
+        },
+        {
+          "IpProtocol": "tcp",
+          "FromPort": 22,
+          "ToPort": 22,
+          "UserIdGroupPairs": [],
+          "IpRanges": [
+            {
+              "CidrIp": "0.0.0.0/0"
+            }
+          ],
+          "Ipv6Ranges": [],
+          "PrefixListIds": []
+        }
+      ]
+    }
+  ]
+}

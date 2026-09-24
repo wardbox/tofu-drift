@@ -140,12 +140,18 @@ func TestScanLocationNotices(t *testing.T) {
 // returns the recorded plan.
 func inModule(t *testing.T, planErr error) {
 	t.Helper()
+	inModuleWith(t, "../../internal/state/testdata/v4.tfstate", "../../internal/plan/testdata/show.json", planErr)
+}
+
+// inModuleWith is inModule with the state pull and show output read from files.
+func inModuleWith(t *testing.T, statePath, showPath string, planErr error) {
+	t.Helper()
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, "main.tf"), nil, 0o644); err != nil {
 		t.Fatal(err)
 	}
-	stateJSON, _ := os.ReadFile("../../internal/state/testdata/v4.tfstate")
-	showJSON, _ := os.ReadFile("../../internal/plan/testdata/show.json")
+	stateJSON, _ := os.ReadFile(statePath)
+	showJSON, _ := os.ReadFile(showPath)
 	origLook, origRun := lookPath, runTool
 	lookPath = func(name string) (string, error) {
 		if name == "tofu" {
@@ -272,5 +278,57 @@ func TestScanDefaultFurniture(t *testing.T) {
 	out, err = runScan(t, "--state", "../../internal/state/testdata/v4.tfstate", "--include-defaults")
 	if !errors.Is(err, errFindings) || !strings.Contains(out, "sg-default") {
 		t.Errorf("--include-defaults must show the default SG:\n%s", out)
+	}
+}
+
+// TestScanSandbox runs scan on the state and refresh-only plan recorded from
+// the sandbox stack after make-mess.sh, with the live resources that were
+// there, and checks the report the sandbox README promises.
+func TestScanSandbox(t *testing.T) {
+	inModuleWith(t, "testdata/sandbox.tfstate", "../../internal/plan/testdata/sandbox-show.json", nil)
+	alb := "arn:aws:elasticloadbalancing:us-west-1:123456789012:loadbalancer/app/tdsbx-alb/a0fb401e97734c75"
+	stubScanners(t,
+		scan.LiveResource{Type: "aws_instance", Key: "i-06368f8a9da7ab277", Class: "t4g.nano", Stopped: true,
+			Derived: []string{"vol-03296e07969f3197f", "eni-0fff9e7f473e2fbbf"}},
+		scan.LiveResource{Type: "aws_ebs_volume", Key: "vol-03296e07969f3197f", Class: "gp3", SizeGB: 8},
+		scan.LiveResource{Type: "aws_ebs_volume", Key: "vol-064471b497294d84e", Class: "gp3", SizeGB: 1},
+		scan.LiveResource{Type: "aws_ebs_volume", Key: "vol-098b6bffba632b1af", Name: "tdsbx-stray-volume", Class: "gp3", SizeGB: 1, Idle: "unattached"},
+		scan.LiveResource{Type: "aws_eip", Key: "eipalloc-0a3d468d4f54332a3", Name: "tdsbx-stray-eip", Idle: "unassociated"},
+		scan.LiveResource{Type: "aws_eip", Key: "eipalloc-0e418919abec57172", Name: "tdsbx-nat-eip"},
+		scan.LiveResource{Type: "aws_nat_gateway", Key: "nat-070535f9aa983d518", Name: "tdsbx-stray-nat",
+			Derived: []string{"eipalloc-0e418919abec57172", "eni-0f1bfa93ad7feabba"}},
+		scan.LiveResource{Type: "aws_lb", Key: alb, ARN: alb, Name: "tdsbx-alb", Class: "application", Idle: "no targets"},
+		scan.LiveResource{Type: "aws_ami", Key: "ami-0bd49cfac2efd7bac", Name: "tdsbx-ami", Idle: "no instances", Derived: []string{"snap-099c5c6f033ec4678"}},
+		scan.LiveResource{Type: "aws_ebs_snapshot", Key: "snap-099c5c6f033ec4678", SizeGB: 1},
+		scan.LiveResource{Type: "aws_security_group", Key: "sg-02650871c4b541c45"},
+		scan.LiveResource{Type: "aws_s3_bucket", Key: "tdsbx-9d855d20238bba926d5ce7291f", Region: "global"},
+	)
+	out, err := runScan(t)
+	if !errors.Is(err, errFindings) {
+		t.Fatalf("want Findings, got %v", err)
+	}
+	for _, want := range []string{
+		"aws_cloudwatch_log_group.app  aws_cloudwatch_log_group  1 (retention_in_days)",
+		"aws_iam_role.lambda           aws_iam_role              1 (description)",
+		"aws_instance.main             aws_instance              2 (tags, tags_all)",
+		"aws_lambda_function.main      aws_lambda_function       2 (last_modified, timeout)",
+		"aws_security_group.main       aws_security_group        1 (ingress)",
+		// NAT gateway with its Elastic IP folded in: $0.045 + $0.005 an hour.
+		"tdsbx-stray-nat     unmanaged       -    36.50",
+		"tdsbx-stray-eip     unmanaged+idle  -    3.65",
+		"tdsbx-stray-volume  unmanaged+idle  -    0.08",
+		"tdsbx-alb           idle            -    16.43",
+		"tdsbx-ami           idle            -    0.05",
+		"Unmanaged: $40/mo · Idle: $20/mo",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("output missing %q:\n%s", want, out)
+		}
+	}
+	// Managed and in use, or folded into a parent: no rows.
+	for _, id := range []string{"i-06368f8a9da7ab277", "vol-03296e07969f3197f", "vol-064471b497294d84e", "eipalloc-0e418919abec57172", "snap-", "sg-", "tdsbx-9d855"} {
+		if strings.Contains(out, id) {
+			t.Errorf("%s must not be a row:\n%s", id, out)
+		}
 	}
 }

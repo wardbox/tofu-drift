@@ -1,0 +1,111 @@
+{
+  "Volumes": [
+    {
+      "AvailabilityZoneId": "usw1-az1",
+      "Iops": 3000,
+      "Tags": [
+        {
+          "Key": "tofu-drift-sandbox",
+          "Value": "tdsbx"
+        }
+      ],
+      "VolumeType": "gp3",
+      "MultiAttachEnabled": false,
+      "Throughput": 125,
+      "Operator": {
+        "Managed": false,
+        "HiddenByDefault": false
+      },
+      "VolumeId": "vol-03296e07969f3197f",
+      "Size": 8,
+      "SnapshotId": "snap-0a0a48475bb61a654",
+      "AvailabilityZone": "us-west-1a",
+      "State": "in-use",
+      "CreateTime": "2026-09-24T03:52:32.115000+00:00",
+      "Attachments": [
+        {
+          "DeleteOnTermination": true,
+          "EbsCardIndex": 0,
+          "VolumeId": "vol-03296e07969f3197f",
+          "InstanceId": "i-06368f8a9da7ab277",
+          "Device": "/dev/xvda",
+          "State": "attached",
+          "AttachTime": "2026-09-24T03:52:32+00:00"
+        }
+      ],
+      "Encrypted": false
+    },
+    {
+      "AvailabilityZoneId": "usw1-az1",
+      "Iops": 3000,
+      "Tags": [
+        {
+          "Key": "tofu-drift-sandbox",
+          "Value": "tdsbx"
+        },
+        {
+          "Key": "Name",
+          "Value": "tdsbx-data"
+        }
+      ],
+      "VolumeType": "gp3",
+      "MultiAttachEnabled": false,
+      "Throughput": 125,
+      "Operator": {
+        "Managed": false,
+        "HiddenByDefault": false
+      },
+      "VolumeId": "vol-064471b497294d84e",
+      "Size": 1,
+      "SnapshotId": "",
+      "AvailabilityZone": "us-west-1a",
+      "State": "in-use",
+      "CreateTime": "2026-09-24T03:52:26.569000+00:00",
+      "Attachments": [
+        {
+          "DeleteOnTermination": false,
+          "EbsCardIndex": 0,
+          "VolumeId": "vol-064471b497294d84e",
+          "InstanceId": "i-06368f8a9da7ab277",
+          "Device": "/dev/sdf",
+          "State": "attached",
+          "AttachTime": "2026-09-24T03:52:53+00:00"
+        }
+      ],
+      "Encrypted": false
+    },
+    {
+      "AvailabilityZoneId": "usw1-az1",
+      "Iops": 3000,
+      "Tags": [
+        {
+          "Key": "tofu-drift-sandbox-planted",
+          "Value": "true"
+        },
+        {
+          "Key": "Name",
+          "Value": "tdsbx-stray-volume"
+        },
+        {
+          "Key": "tofu-drift-sandbox",
+          "Value": "tdsbx"
+        }
+      ],
+      "VolumeType": "gp3",
+      "MultiAttachEnabled": false,
+      "Throughput": 125,
+      "Operator": {
+        "Managed": false,
+        "HiddenByDefault": false
+      },
+      "VolumeId": "vol-098b6bffba632b1af",
+      "Size": 1,
+      "SnapshotId": "",
+      "AvailabilityZone": "us-west-1a",
+      "State": "available",
+      "CreateTime": "2026-09-24T03:56:05.290000+00:00",
+      "Attachments": [],
+      "Encrypted": false
+    }
+  ]
+}

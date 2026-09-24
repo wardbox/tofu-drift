@@ -3,6 +3,7 @@ package scan
 import (
 	"context"
 	"math"
+	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -27,7 +28,10 @@ func (s LogGroups) List(ctx context.Context) ([]LiveResource, error) {
 		}
 		for _, g := range page.LogGroups {
 			r := LiveResource{
-				Type: "aws_cloudwatch_log_group", Key: aws.ToString(g.LogGroupName), ARN: aws.ToString(g.Arn),
+				Type: "aws_cloudwatch_log_group", Key: aws.ToString(g.LogGroupName),
+				// Arn ends in ":*" (the group's streams); Ignore Rules and
+				// --explain want the group's own ARN.
+				ARN: strings.TrimSuffix(aws.ToString(g.Arn), ":*"),
 				// GiB to 3 decimals, so --explain math reads "4.657 GB".
 				SizeGB: math.Round(float64(aws.ToInt64(g.StoredBytes))/(1<<30)*1000) / 1000,
 			}

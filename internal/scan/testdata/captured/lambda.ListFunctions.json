@@ -1,0 +1,37 @@
+{
+  "Functions": [
+    {
+      "FunctionName": "tdsbx-fn",
+      "FunctionArn": "arn:aws:lambda:us-west-1:123456789012:function:tdsbx-fn",
+      "Runtime": "python3.12",
+      "Role": "arn:aws:iam::123456789012:role/tdsbx-lambda",
+      "Handler": "index.handler",
+      "CodeSize": 181,
+      "Description": "",
+      "Timeout": 10,
+      "MemorySize": 128,
+      "LastModified": "2026-09-24T03:56:03.000+0000",
+      "CodeSha256": "+xbZKF8dbPs82iP1mGd3pP8T+l6XCz7pzu8oBok0GxU=",
+      "Version": "$LATEST",
+      "TracingConfig": {
+        "Mode": "PassThrough"
+      },
+      "RevisionId": "40bcc0d0-1ccf-4691-8e20-9b1071138eec",
+      "PackageType": "Zip",
+      "Architectures": [
+        "arm64"
+      ],
+      "EphemeralStorage": {
+        "Size": 512
+      },
+      "SnapStart": {
+        "ApplyOn": "None",
+        "OptimizationStatus": "Off"
+      },
+      "LoggingConfig": {
+        "LogFormat": "Text",
+        "LogGroup": "/aws/lambda/tdsbx-fn"
+      }
+    }
+  ]
+}

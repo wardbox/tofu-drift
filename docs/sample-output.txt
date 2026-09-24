@@ -1,0 +1,17 @@
+Drift
+ADDRESS                       TYPE                      CHANGED
+aws_cloudwatch_log_group.app  aws_cloudwatch_log_group  1 (retention_in_days)
+aws_iam_role.lambda           aws_iam_role              1 (description)
+aws_instance.main             aws_instance              2 (tags, tags_all)
+aws_lambda_function.main      aws_lambda_function       2 (last_modified, timeout)
+aws_security_group.main       aws_security_group        1 (ingress)
+
+Unmanaged & idle
+TYPE             ID                                                                                               REGION     NAME                STATUS          AGE  $/MO   kgCO₂/MO  NOTE
+aws_nat_gateway  nat-070535f9aa983d518                                                                            us-west-1  tdsbx-stray-nat     unmanaged       0d   38.69  0.0       -
+aws_lb           arn:aws:elasticloadbalancing:us-west-1:123456789012:loadbalancer/app/tdsbx-alb/a0fb401e97734c75  us-west-1  tdsbx-alb           idle            0d   18.40  0.0       -
+aws_eip          eipalloc-0a3d468d4f54332a3                                                                       us-west-1  tdsbx-stray-eip     unmanaged+idle  -    3.65   0.0       -
+aws_ebs_volume   vol-098b6bffba632b1af                                                                            us-west-1  tdsbx-stray-volume  unmanaged+idle  0d   0.10   0.0       -
+aws_ami          ami-0bd49cfac2efd7bac                                                                            us-west-1  tdsbx-ami           idle            0d   0.06   0.0       -
+
+Unmanaged: $42/mo · Idle: $22/mo · ~0.0 kgCO₂/mo (≈ 0.00 trans-Atlantic flights)
