@@ -1,5 +1,11 @@
 # tofu-drift
 
+## Permissions
+
+tofu-drift is read-only. [`iam-policy.json`](iam-policy.json) lists every AWS action a scan calls, and a test keeps it in step with the scanners. Run without credentials and tofu-drift prints that policy and exits 2. Reading state from `s3://` additionally needs `s3:GetObject` on the state object.
+
+If one service's calls are denied or take longer than 30 seconds, that service is skipped with a notice naming the actions it needs, and the rest of the report is still produced. The run exits 2 only when every service fails.
+
 ## Coverage
 
 | Resource | OpenTofu type | Idle when | Cost basis |

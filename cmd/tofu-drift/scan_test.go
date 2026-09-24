@@ -20,8 +20,12 @@ type fakeScanner []scan.LiveResource
 func (f fakeScanner) List(context.Context) ([]scan.LiveResource, error) { return f, nil }
 func (fakeScanner) Permissions() []string                               { return nil }
 
-// Tests never reach AWS: no live resources unless a test stubs some.
-func init() { stubbed(nil) }
+// Tests never reach AWS: credentials always present, no live resources unless
+// a test stubs some.
+func init() {
+	retrieveCredentials = func(context.Context, aws.Config) error { return nil }
+	stubbed(nil)
+}
 
 func stubbed(live []scan.LiveResource) {
 	newScanners = func(aws.Config) []scan.Scanner { return []scan.Scanner{fakeScanner(live)} }

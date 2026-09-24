@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"maps"
@@ -19,6 +20,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
 	"github.com/spf13/cobra"
+	tofudrift "github.com/wardbox/tofu-drift"
 	"github.com/wardbox/tofu-drift/internal/match"
 	"github.com/wardbox/tofu-drift/internal/plan"
 	"github.com/wardbox/tofu-drift/internal/report"
@@ -53,26 +55,56 @@ var newScanners = func(cfg aws.Config) []scan.Scanner {
 	}
 }
 
+// scannerTimeout bounds each scanner's List. Swapped in tests.
+var scannerTimeout = 30 * time.Second
+
 // listAll runs every scanner, at most 8 at once, and concatenates the results
-// in scanner order.
-func listAll(ctx context.Context, scanners []scan.Scanner) ([]scan.LiveResource, error) {
+// in scanner order. A scanner that fails or times out is skipped with a notice
+// on w; it is an error only when every scanner fails.
+func listAll(ctx context.Context, w io.Writer, scanners []scan.Scanner) ([]scan.LiveResource, error) {
 	results := make([][]scan.LiveResource, len(scanners))
-	g, ctx := errgroup.WithContext(ctx)
+	notices := make([]string, len(scanners))
+	var g errgroup.Group
 	g.SetLimit(8)
 	for i, s := range scanners {
-		g.Go(func() (err error) {
-			results[i], err = s.List(ctx)
-			return err
+		g.Go(func() error {
+			ctx, cancel := context.WithTimeout(ctx, scannerTimeout)
+			defer cancel()
+			rs, err := s.List(ctx)
+			switch {
+			case ctx.Err() == context.DeadlineExceeded:
+				notices[i] = fmt.Sprintf("notice: skipped %T: timed out after %s\n", s, scannerTimeout)
+			case err != nil:
+				notices[i] = fmt.Sprintf("notice: skipped %T (needs %s): %v\n", s, strings.Join(s.Permissions(), ", "), err)
+			default:
+				results[i] = rs
+			}
+			return nil
 		})
 	}
-	if err := g.Wait(); err != nil {
-		return nil, err
-	}
+	_ = g.Wait()
 	var all []scan.LiveResource
-	for _, rs := range results {
+	failed := 0
+	for i, rs := range results {
 		all = append(all, rs...)
+		if notices[i] != "" {
+			fmt.Fprint(w, notices[i])
+			failed++
+		}
+	}
+	if failed > 0 && failed == len(scanners) {
+		return nil, fmt.Errorf("every scanner failed, see notices above")
 	}
 	return all, nil
+}
+
+// retrieveCredentials fails when cfg has no usable AWS credentials. Swapped in tests.
+var retrieveCredentials = func(ctx context.Context, cfg aws.Config) error {
+	if cfg.Credentials == nil {
+		return errors.New("no credential provider configured")
+	}
+	_, err := cfg.Credentials.Retrieve(ctx)
+	return err
 }
 
 // callerAccount returns the STS caller's account id. Swapped in tests.
@@ -102,6 +134,11 @@ func scanCmd() *cobra.Command {
 			cfg, err := config.LoadDefaultConfig(ctx, opts...)
 			if err != nil {
 				return err
+			}
+			if err := retrieveCredentials(ctx, cfg); err != nil {
+				fmt.Fprintln(cmd.ErrOrStderr(), "tofu-drift needs read-only AWS credentials. Attach this IAM policy (iam-policy.json) to the role or user you scan with:")
+				fmt.Fprint(cmd.OutOrStdout(), string(tofudrift.IAMPolicy))
+				return fmt.Errorf("no AWS credentials: %w", err)
 			}
 			dir, err := os.Getwd()
 			if err != nil {
@@ -161,7 +198,7 @@ func scanCmd() *cobra.Command {
 				return errFindings
 			}
 
-			live, err := listAll(ctx, newScanners(cfg))
+			live, err := listAll(ctx, cmd.ErrOrStderr(), newScanners(cfg))
 			if err != nil {
 				return err
 			}
