@@ -3,6 +3,7 @@
     "alb_hour": 0.0243,
     "clb_hour": 0.027,
     "eip_hour": 0.005,
+    "log_storage_gb_month": 0.033,
     "nat_gateway_hour": 0.062,
     "nlb_hour": 0.0243,
     "snapshot_gb_month": 0.05
@@ -11,6 +12,7 @@
     "alb_hour": 0.0225,
     "clb_hour": 0.025,
     "eip_hour": 0.005,
+    "log_storage_gb_month": 0.0314,
     "nat_gateway_hour": 0.059,
     "nlb_hour": 0.0225,
     "snapshot_gb_month": 0.05
@@ -19,6 +21,7 @@
     "alb_hour": 0.0239,
     "clb_hour": 0.0266,
     "eip_hour": 0.005,
+    "log_storage_gb_month": 0.0306,
     "nat_gateway_hour": 0.056,
     "nlb_hour": 0.0239,
     "snapshot_gb_month": 0.05
@@ -27,6 +30,7 @@
     "alb_hour": 0.0252,
     "clb_hour": 0.028,
     "eip_hour": 0.005,
+    "log_storage_gb_month": 0.033,
     "nat_gateway_hour": 0.059,
     "nlb_hour": 0.0252,
     "snapshot_gb_month": 0.05
@@ -35,6 +39,7 @@
     "alb_hour": 0.0252,
     "clb_hour": 0.028,
     "eip_hour": 0.005,
+    "log_storage_gb_month": 0.033,
     "nat_gateway_hour": 0.059,
     "nlb_hour": 0.0252,
     "snapshot_gb_month": 0.055
@@ -43,6 +48,7 @@
     "alb_hour": 0.02475,
     "clb_hour": 0.0275,
     "eip_hour": 0.005,
+    "log_storage_gb_month": 0.033,
     "nat_gateway_hour": 0.05,
     "nlb_hour": 0.02475,
     "snapshot_gb_month": 0.055
@@ -51,6 +57,7 @@
     "alb_hour": 0.027,
     "clb_hour": 0.03,
     "eip_hour": 0.005,
+    "log_storage_gb_month": 0.0324,
     "nat_gateway_hour": 0.052,
     "nlb_hour": 0.027,
     "snapshot_gb_month": 0.054
@@ -59,6 +66,7 @@
     "alb_hour": 0.02394,
     "clb_hour": 0.0266,
     "eip_hour": 0.005,
+    "log_storage_gb_month": 0.0315,
     "nat_gateway_hour": 0.046,
     "nlb_hour": 0.02394,
     "snapshot_gb_month": 0.0475
@@ -67,6 +75,7 @@
     "alb_hour": 0.0252,
     "clb_hour": 0.028,
     "eip_hour": 0.005,
+    "log_storage_gb_month": 0.03,
     "nat_gateway_hour": 0.048,
     "nlb_hour": 0.0252,
     "snapshot_gb_month": 0.05
@@ -75,6 +84,7 @@
     "alb_hour": 0.02646,
     "clb_hour": 0.0294,
     "eip_hour": 0.005,
+    "log_storage_gb_month": 0.0315,
     "nat_gateway_hour": 0.05,
     "nlb_hour": 0.02646,
     "snapshot_gb_month": 0.053
@@ -83,6 +93,7 @@
     "alb_hour": 0.02646,
     "clb_hour": 0.0294,
     "eip_hour": 0.005,
+    "log_storage_gb_month": 0.0315,
     "nat_gateway_hour": 0.05,
     "nlb_hour": 0.02646,
     "snapshot_gb_month": 0.053
@@ -91,6 +102,7 @@
     "alb_hour": 0.034,
     "clb_hour": 0.034,
     "eip_hour": 0.005,
+    "log_storage_gb_month": 0.0408,
     "nat_gateway_hour": 0.093,
     "nlb_hour": 0.034,
     "snapshot_gb_month": 0.068
@@ -99,6 +111,7 @@
     "alb_hour": 0.0225,
     "clb_hour": 0.025,
     "eip_hour": 0.005,
+    "log_storage_gb_month": 0.03,
     "nat_gateway_hour": 0.045,
     "nlb_hour": 0.0225,
     "snapshot_gb_month": 0.05
@@ -107,6 +120,7 @@
     "alb_hour": 0.0225,
     "clb_hour": 0.025,
     "eip_hour": 0.005,
+    "log_storage_gb_month": 0.03,
     "nat_gateway_hour": 0.045,
     "nlb_hour": 0.0225,
     "snapshot_gb_month": 0.05
@@ -115,6 +129,7 @@
     "alb_hour": 0.0252,
     "clb_hour": 0.028,
     "eip_hour": 0.005,
+    "log_storage_gb_month": 0.03,
     "nat_gateway_hour": 0.048,
     "nlb_hour": 0.0252,
     "snapshot_gb_month": 0.055
@@ -123,6 +138,7 @@
     "alb_hour": 0.0225,
     "clb_hour": 0.025,
     "eip_hour": 0.005,
+    "log_storage_gb_month": 0.03,
     "nat_gateway_hour": 0.045,
     "nlb_hour": 0.0225,
     "snapshot_gb_month": 0.05

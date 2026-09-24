@@ -57,7 +57,7 @@ func Monthly(region string, r scan.LiveResource) float64 {
 			disk = "hdd"
 		}
 		return storage(region, disk, r.SizeGB)
-	case "aws_ebs_snapshot":
+	case "aws_ebs_snapshot", "aws_cloudwatch_log_group":
 		return storage(region, "hdd", r.SizeGB)
 	}
 	return 0

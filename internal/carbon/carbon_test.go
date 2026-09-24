@@ -26,7 +26,10 @@ func TestMonthlyFlat(t *testing.T) {
 	if got := Monthly("us-east-1", scan.LiveResource{Type: "aws_ebs_snapshot", SizeGB: 1000}); math.Abs(got-want) > 1e-9 {
 		t.Errorf("snapshot: got %v, want %v", got, want)
 	}
-	for _, typ := range []string{"aws_eip", "aws_network_interface", "aws_nat_gateway", "aws_lb", "aws_elb", "aws_ami"} {
+	if got := Monthly("us-east-1", scan.LiveResource{Type: "aws_cloudwatch_log_group", SizeGB: 1000}); math.Abs(got-want) > 1e-9 {
+		t.Errorf("log group: got %v, want %v (HDD, like snapshots)", got, want)
+	}
+	for _, typ := range []string{"aws_eip", "aws_network_interface", "aws_nat_gateway", "aws_lb", "aws_elb", "aws_ami", "aws_iam_role", "aws_iam_user", "aws_route53_zone", "aws_lambda_function"} {
 		if got := Monthly("us-east-1", scan.LiveResource{Type: typ, SizeGB: 1000}); got != 0 {
 			t.Errorf("%s: got %v, want 0 (network ignored; AMIs carry carbon via their snapshots)", typ, got)
 		}

@@ -29,7 +29,8 @@ type LiveResource struct {
 	// Derived are the Match Keys of Derived Resources folded into this one.
 	Derived []string
 	// Default is AWS's own marker that it created the resource: default VPC,
-	// default-for-AZ subnet, main route table, default security group.
+	// default-for-AZ subnet, main route table, default security group,
+	// service-linked IAM role.
 	Default bool
 
 	// Cost inputs.

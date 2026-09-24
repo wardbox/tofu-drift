@@ -15,6 +15,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/autoscaling"
+	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
@@ -22,7 +23,10 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/elasticache"
 	elb "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancing"
 	elbv2 "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2"
+	"github.com/aws/aws-sdk-go-v2/service/iam"
+	"github.com/aws/aws-sdk-go-v2/service/lambda"
 	"github.com/aws/aws-sdk-go-v2/service/rds"
+	"github.com/aws/aws-sdk-go-v2/service/route53"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
 	"github.com/spf13/cobra"
@@ -68,6 +72,12 @@ var newScanners = func(cfg aws.Config) []scan.Scanner {
 		scan.EKSClusters{Client: eks.NewFromConfig(cfg)},
 		scan.ECSClusters{Client: ecs.NewFromConfig(cfg)},
 		scan.ECSServices{Client: ecs.NewFromConfig(cfg)},
+		// IAM and Route53 are global: scanned whatever the region.
+		scan.IAMRoles{Client: iam.NewFromConfig(cfg)},
+		scan.IAMUsers{Client: iam.NewFromConfig(cfg)},
+		scan.Route53Zones{Client: route53.NewFromConfig(cfg)},
+		scan.LambdaFunctions{Client: lambda.NewFromConfig(cfg)},
+		scan.LogGroups{Client: cloudwatchlogs.NewFromConfig(cfg)},
 	}
 }
 
@@ -140,7 +150,7 @@ func (p *pipeline) flags(cmd *cobra.Command) {
 	cmd.Flags().StringVar(&p.statePath, "state", "", "state file: local path or s3://bucket/key (default: tofu state pull in the current root module)")
 	cmd.Flags().StringVar(&p.region, "region", "", "AWS region to scan (default: from environment or profile)")
 	cmd.Flags().StringVar(&p.profile, "profile", "", "AWS shared config profile")
-	cmd.Flags().BoolVar(&p.includeDefaults, "include-defaults", false, "report Default Furniture: the default VPC and its subnets, main route tables, default security groups, the default ECS cluster")
+	cmd.Flags().BoolVar(&p.includeDefaults, "include-defaults", false, "report Default Furniture: the default VPC and its subnets, main route tables, default security groups, the default ECS cluster, service-linked IAM roles")
 	cmd.Flags().StringVar(&p.configPath, "config", "tofu-drift.toml", "config file with Ignore Rules (optional unless given)")
 }
 
