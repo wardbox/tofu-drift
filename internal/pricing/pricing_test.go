@@ -22,6 +22,16 @@ func TestMonthlyData(t *testing.T) {
 		{"af-south-1", scan.LiveResource{Type: "aws_elasticache_replication_group", Class: "cache.t3.micro", Nodes: 2}, 2 * 0.017 * 730, true},
 		{"us-east-1", scan.LiveResource{Type: "aws_s3_bucket"}, 0, false},
 		{"us-east-1", scan.LiveResource{Type: "aws_dynamodb_table"}, 0, false},
+		// RDS storage bills running or stopped, doubled for Multi-AZ.
+		{"us-east-1", scan.LiveResource{Type: "aws_db_instance", Class: "db.t3.micro", Storage: "gp3", SizeGB: 20}, 0.017*730 + 20*0.115, false},
+		{"us-east-1", scan.LiveResource{Type: "aws_db_instance", Class: "db.t3.micro", Storage: "gp3", SizeGB: 20, Nodes: 2}, 2 * (0.017*730 + 20*0.115), false},
+		{"us-east-1", scan.LiveResource{Type: "aws_db_instance", Class: "db.t3.micro", Storage: "gp3", SizeGB: 20, Stopped: true}, 20 * 0.115, false},
+		{"us-east-1", scan.LiveResource{Type: "aws_db_instance", Class: "db.t3.micro", Storage: "io1", SizeGB: 100, Stopped: true}, 100 * 0.125, false},
+		{"eu-central-1", scan.LiveResource{Type: "aws_db_instance", Class: "db.t3.micro", Storage: "gp2", SizeGB: 100, Stopped: true}, 100 * 0.137, false},
+		// Aurora storage is billed per cluster by usage: not estimated.
+		{"us-east-1", scan.LiveResource{Type: "aws_db_instance", Class: "db.t3.micro", Storage: "aurora", SizeGB: 1}, 0.017 * 730, false},
+		{"us-east-1", scan.LiveResource{Type: "aws_db_snapshot", Class: "manual", SizeGB: 20}, 20 * 0.095, false},
+		{"us-east-1", scan.LiveResource{Type: "aws_db_snapshot", Class: "automated", SizeGB: 20}, 0, false},
 	} {
 		got, approx := Monthly(tc.region, tc.r)
 		if math.Abs(got-tc.want) > 1e-9 || approx != tc.approx {
@@ -94,6 +104,7 @@ func TestMonthlyFlat(t *testing.T) {
 		{"us-east-1", scan.LiveResource{Type: "aws_cloudwatch_log_group", SizeGB: 100}, 3},
 		{"sa-east-1", scan.LiveResource{Type: "aws_cloudwatch_log_group", SizeGB: 100}, 4.08},
 		{"us-east-1", scan.LiveResource{Type: "aws_lambda_function"}, 0},
+		{"eu-west-1", scan.LiveResource{Type: "aws_route53_zone"}, 0.50},
 		// ENIs are free; an AMI's cost is its Derived snapshots.
 		{"us-east-1", scan.LiveResource{Type: "aws_network_interface"}, 0},
 		{"us-east-1", scan.LiveResource{Type: "aws_ami"}, 0},
@@ -104,7 +115,8 @@ func TestMonthlyFlat(t *testing.T) {
 	}
 	// Every region seeded carries every flat rate.
 	for region, rates := range flat {
-		for _, k := range []string{"eip_hour", "nat_gateway_hour", "alb_hour", "nlb_hour", "clb_hour", "snapshot_gb_month", "log_storage_gb_month"} {
+		for _, k := range []string{"eip_hour", "nat_gateway_hour", "alb_hour", "nlb_hour", "clb_hour", "snapshot_gb_month", "log_storage_gb_month",
+			"rds_gp2_gb_month", "rds_gp3_gb_month", "rds_io1_gb_month", "rds_io2_gb_month", "rds_standard_gb_month", "rds_backup_gb_month"} {
 			if rates[k] <= 0 {
 				t.Errorf("%s: no %s", region, k)
 			}
@@ -129,6 +141,12 @@ func TestMath(t *testing.T) {
 		{"us-east-1", scan.LiveResource{Type: "aws_db_instance", Class: "db.t3.micro", Nodes: 2}, "db.t3.micro $0.017/h × 730 h × 2 nodes = $24.82/mo"},
 		{"af-south-1", scan.LiveResource{Type: "aws_elasticache_replication_group", Class: "cache.t3.micro", Nodes: 3}, "cache.t3.micro $0.017/h × 730 h × 3 nodes = $37.23/mo (≈ us-east-1 price)"},
 		{"us-east-1", scan.LiveResource{Type: "aws_db_instance", Class: "db.t3.micro", Stopped: true}, "db.t3.micro stopped, no compute charge = $0.00/mo"},
+		{"us-east-1", scan.LiveResource{Type: "aws_db_instance", Class: "db.t3.micro", Storage: "gp3", SizeGB: 20}, "db.t3.micro $0.017/h × 730 h + gp3 20 GB × $0.115/GB-mo = $14.71/mo"},
+		{"us-east-1", scan.LiveResource{Type: "aws_db_instance", Class: "db.t3.micro", Storage: "gp3", SizeGB: 20, Nodes: 2}, "db.t3.micro $0.017/h × 730 h × 2 nodes + gp3 20 GB × $0.115/GB-mo × 2 = $29.42/mo"},
+		{"us-east-1", scan.LiveResource{Type: "aws_db_instance", Class: "db.t3.micro", Storage: "gp3", SizeGB: 20, Stopped: true}, "db.t3.micro stopped, no compute charge + gp3 20 GB × $0.115/GB-mo = $2.30/mo"},
+		{"us-east-1", scan.LiveResource{Type: "aws_db_snapshot", Class: "manual", SizeGB: 20}, "snapshot 20 GB × $0.095/GB-mo = $1.90/mo"},
+		{"us-east-1", scan.LiveResource{Type: "aws_db_snapshot", Class: "automated", SizeGB: 20}, "automated backup, free up to DB size = $0.00/mo"},
+		{"us-east-1", scan.LiveResource{Type: "aws_route53_zone"}, "$0.50/zone-mo = $0.50/mo"},
 		{"us-east-1", scan.LiveResource{Type: "aws_s3_bucket"}, "size unknown = $0.00/mo"},
 		{"us-east-1", scan.LiveResource{Type: "aws_cloudwatch_log_group", SizeGB: 4.657}, "4.657 GB × $0.03/GB-mo = $0.14/mo"},
 		{"us-east-1", scan.LiveResource{Type: "aws_lambda_function"}, "requests and duration not estimated = $0.00/mo"},

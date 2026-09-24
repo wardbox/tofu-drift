@@ -105,16 +105,19 @@ func TestScanJSON(t *testing.T) {
 		t.Fatalf("want errFindings, got %v", err)
 	}
 	var got struct {
-		Schema   int               `json:"schema"`
-		Scan     map[string]string `json:"scan"`
-		Findings []map[string]any  `json:"findings"`
-		Totals   map[string]float64
+		Schema       int               `json:"schema"`
+		DriftChecked *bool             `json:"drift_checked"`
+		Scan         map[string]string `json:"scan"`
+		Findings     []map[string]any  `json:"findings"`
+		Totals       map[string]float64
 	}
 	if err := json.Unmarshal([]byte(out), &got); err != nil {
 		t.Fatalf("invalid json: %v\n%s", err, out)
 	}
 	if got.Schema != 1 || len(got.Findings) != 1 || got.Findings[0]["id"] != "vol-stray" || got.Findings[0]["idle"] != "unattached" ||
-		got.Scan["state_source"] == "" || got.Scan["region"] != "us-east-1" {
+		got.Scan["state_source"] == "" || got.Scan["region"] != "us-east-1" ||
+		got.DriftChecked == nil || *got.DriftChecked { // --state skips drift detection
+
 		t.Errorf("unexpected report: %s", out)
 	}
 	for _, k := range []string{"unmanaged_usd_mo", "idle_usd_mo", "kgco2_mo"} {
@@ -195,6 +198,10 @@ func TestScanDrift(t *testing.T) {
 		if !strings.Contains(out, want) {
 			t.Errorf("output missing %q:\n%s", want, out)
 		}
+	}
+
+	if out, _ = runScan(t, "--json"); !strings.Contains(out, `"drift_checked": true`) {
+		t.Errorf("--json after a refresh-only plan must say drift_checked true:\n%s", out)
 	}
 
 	out, err = runScan(t, "--explain", "aws_db_instance.main")

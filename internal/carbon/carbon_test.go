@@ -14,6 +14,11 @@ func TestMonthlyEBS(t *testing.T) {
 	if math.Abs(got-want) > 1e-9 {
 		t.Errorf("ssd: got %v, want %v", got, want)
 	}
+	// RDS storage is SSD like EBS, billed stopped or not, ×2 for Multi-AZ.
+	rds := scan.LiveResource{Type: "aws_db_instance", Storage: "gp3", SizeGB: 1000, Stopped: true, Nodes: 2}
+	if got := Monthly("us-east-1", rds); math.Abs(got-2*want) > 1e-9 {
+		t.Errorf("rds storage: got %v, want %v", got, 2*want)
+	}
 	hdd := Monthly("us-east-1", scan.LiveResource{Type: "aws_ebs_volume", Class: "sc1", SizeGB: 1000})
 	if hdd >= got || hdd == 0 {
 		t.Errorf("hdd should be below ssd and nonzero: %v vs %v", hdd, got)
@@ -28,6 +33,12 @@ func TestMonthlyFlat(t *testing.T) {
 	}
 	if got := Monthly("us-east-1", scan.LiveResource{Type: "aws_cloudwatch_log_group", SizeGB: 1000}); math.Abs(got-want) > 1e-9 {
 		t.Errorf("log group: got %v, want %v (HDD, like snapshots)", got, want)
+	}
+	if got := Monthly("us-east-1", scan.LiveResource{Type: "aws_db_snapshot", Class: "manual", SizeGB: 1000}); math.Abs(got-want) > 1e-9 {
+		t.Errorf("rds snapshot: got %v, want %v (HDD, like EBS snapshots)", got, want)
+	}
+	if got := Monthly("us-east-1", scan.LiveResource{Type: "aws_db_snapshot", Class: "automated", SizeGB: 1000}); got != 0 {
+		t.Errorf("automated rds snapshot: got %v, want 0 (folded, free up to DB size)", got)
 	}
 	for _, typ := range []string{"aws_eip", "aws_network_interface", "aws_nat_gateway", "aws_lb", "aws_elb", "aws_ami", "aws_iam_role", "aws_iam_user", "aws_route53_zone", "aws_lambda_function"} {
 		if got := Monthly("us-east-1", scan.LiveResource{Type: typ, SizeGB: 1000}); got != 0 {

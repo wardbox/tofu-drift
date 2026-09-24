@@ -45,6 +45,8 @@ func db(id, status string) rdstypes.DBInstance {
 		DBInstanceClass:      aws.String("db.t3.micro"),
 		DBInstanceStatus:     aws.String(status),
 		Engine:               aws.String("mysql"),
+		AllocatedStorage:     aws.Int32(20),
+		StorageType:          aws.String("gp3"),
 	}
 }
 
@@ -88,11 +90,11 @@ func TestRDSInstancesList(t *testing.T) {
 	app, old := got[0], got[1]
 	if app.Type != "aws_db_instance" || app.Key != "app" || app.ARN != "arn:aws:rds:us-east-1:1:db:app" ||
 		app.Name != "app db" || app.Class != "db.t3.micro" || app.Nodes != 2 || app.Created == nil ||
-		app.Idle != "" || app.Stopped ||
+		app.Idle != "" || app.Stopped || app.SizeGB != 20 || app.Storage != "gp3" ||
 		fmt.Sprint(app.Derived) != "[rds:app-2026-09-01 rds:app-2026-09-02]" {
 		t.Errorf("running multi-AZ: %+v", app)
 	}
-	if old.Key != "old" || old.Idle != "stopped" || !old.Stopped || old.Nodes != 1 || len(old.Derived) != 0 {
+	if old.Key != "old" || old.Idle != "stopped" || !old.Stopped || old.Nodes != 1 || len(old.Derived) != 0 || old.SizeGB != 20 {
 		t.Errorf("stopped: %+v", old)
 	}
 }
@@ -106,8 +108,11 @@ func TestRDSSnapshotsList(t *testing.T) {
 		t.Fatalf("got %+v, want all 3", got)
 	}
 	manual := got[2]
-	if manual.Type != "aws_db_snapshot" || manual.Key != "before-upgrade" || manual.SizeGB != 20 {
+	if manual.Type != "aws_db_snapshot" || manual.Key != "before-upgrade" || manual.SizeGB != 20 || manual.Class != "manual" {
 		t.Errorf("manual: %+v", manual)
+	}
+	if got[0].Class != "automated" {
+		t.Errorf("automated: %+v", got[0])
 	}
 }
 

@@ -62,11 +62,13 @@ func (s RDSInstances) List(ctx context.Context) ([]LiveResource, error) {
 				Tags:    tags,
 				Created: d.InstanceCreateTime,
 				Class:   aws.ToString(d.DBInstanceClass),
+				SizeGB:  float64(aws.ToInt32(d.AllocatedStorage)),
+				Storage: aws.ToString(d.StorageType),
 				Nodes:   1,
 				Derived: auto[id],
 			}
 			if aws.ToBool(d.MultiAZ) {
-				r.Nodes = 2 // a standby instance billed like the primary
+				r.Nodes = 2 // a standby instance, and its storage, billed like the primary
 			}
 			if aws.ToString(d.DBInstanceStatus) == "stopped" {
 				r.Idle, r.Stopped = "stopped", true
@@ -103,6 +105,7 @@ func (s RDSSnapshots) List(ctx context.Context) ([]LiveResource, error) {
 				Tags:    tags,
 				Created: v.SnapshotCreateTime,
 				SizeGB:  float64(aws.ToInt32(v.AllocatedStorage)),
+				Class:   aws.ToString(v.SnapshotType), // automated, manual, awsbackup, ...
 			})
 		}
 	}
