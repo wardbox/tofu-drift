@@ -4,177 +4,65 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light dark">
-<title>tofu-drift: drift, unmanaged and idle AWS resources, with cost and carbon</title>
-<meta name="description" content="tofu-drift reports drift on OpenTofu/Terraform-managed AWS resources and finds unmanaged and idle ones, with $/mo and kgCO₂/mo estimates. AWS only, read-only, no backend.">
+<title>tofu-drift: find drift and stray stuff in your aws account</title>
+<meta name="description" content="tells you what changed in aws outside of tofu, and what's running with no state behind it, with a rough $/mo and kgCO₂/mo on each. read-only, no backend.">
 <style>
 :root {
-  --bg: #f3f5f7; --surface: #fff; --ink: #16202a; --muted: #4f5d6a; --line: #d3dae0;
+  --bg: #fbfbfa; --ink: #1b1d1f; --muted: #5d6166; --line: #dcdcd8; --code: #f0f0ed;
   --drift: #8f5200; --unmanaged: #74399a; --idle: #1c6a86;
-  --term-bg: #121820; --term-ink: #d9dfe5; --term-dim: #8b98a5; --term-ps: #7cc99a;
   --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
-  --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  --radius: 6px;
 }
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #12171c; --surface: #1a2129; --ink: #e3e8ec; --muted: #9eabb6; --line: #2d3843;
+    --bg: #151617; --ink: #e2e2df; --muted: #9a9da1; --line: #2e3033; --code: #1e2022;
     --drift: #e8a93f; --unmanaged: #c99aea; --idle: #6cc2dc;
-    --term-bg: #0c1015;
   }
 }
-* { box-sizing: border-box; }
-html { -webkit-text-size-adjust: 100%; }
-body { margin: 0; background: var(--bg); color: var(--ink); font: 1.0625rem/1.6 var(--sans); }
-a { color: inherit; text-decoration-thickness: 1px; text-underline-offset: 3px; }
-a:hover { text-decoration-thickness: 2px; }
+body { margin: 0 auto; max-width: 44rem; padding: 3rem 1.25rem 4rem; background: var(--bg); color: var(--ink); font: 1rem/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+a { color: inherit; text-underline-offset: 3px; }
 :focus-visible { outline: 2px solid var(--idle); outline-offset: 2px; }
-code, pre, kbd { font-family: var(--mono); font-size: .9em; }
-:not(pre) > code { overflow-wrap: anywhere; background: var(--surface); border: 1px solid var(--line); border-radius: 4px; padding: .05em .3em; }
-.wrap { max-width: 68rem; margin: 0 auto; padding: 0 1.25rem; }
-.prose { max-width: 42rem; }
-section { padding: 3.5rem 0; border-top: 1px solid var(--line); }
-h2 { font-size: 1.6rem; line-height: 1.25; margin: 0 0 .5rem; letter-spacing: -.01em; }
-h3 { font-size: 1.1rem; margin: 2rem 0 .75rem; }
-p { margin: 0 0 1rem; }
+h1 { font: 700 2rem/1.2 var(--mono); margin: 0 0 1rem; }
+h2 { font-size: 1.25rem; margin: 3rem 0 .75rem; }
+h3 { font-size: 1rem; margin: 1.75rem 0 .25rem; }
+p, ul, ol { margin: 0 0 1rem; }
+code, pre { font-family: var(--mono); font-size: .875em; }
+:not(pre) > code { background: var(--code); padding: .1em .3em; border-radius: 3px; }
+pre { background: var(--code); padding: .75rem 1rem; overflow-x: auto; line-height: 1.45; margin: 0 0 1rem; }
+pre.wide { font-size: .78em; }
 .muted { color: var(--muted); }
-
-/* Hero: the name drifts off its own shadow */
-header.wrap { padding-top: 4.5rem; padding-bottom: 3.5rem; }
-.mark { position: relative; isolation: isolate; display: inline-block; margin: 0 0 1.5rem; font: 700 clamp(2.6rem, 9vw, 5rem)/1 var(--mono); letter-spacing: -.04em; }
-.mark .ghost { position: absolute; left: 0; top: 0; color: var(--drift); opacity: .35; transform: translate(.09em, -.07em); z-index: -1; }
-.pitch { font-size: clamp(1.25rem, 2.6vw, 1.6rem); line-height: 1.35; max-width: 36rem; margin-bottom: .75rem; }
-.install { display: flex; align-items: stretch; max-width: 36rem; margin-top: 2rem; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); }
-.install pre { flex: 1; min-width: 0; margin: 0; padding: .8rem 1rem; overflow-x: auto; }
-.install pre::before { content: "$ "; color: var(--muted); }
-button { font: inherit; color: inherit; cursor: pointer; }
-.copy { border: 0; border-left: 1px solid var(--line); background: none; padding: 0 1rem; font-size: .9rem; color: var(--muted); border-radius: 0 var(--radius) var(--radius) 0; }
-.copy:hover { color: var(--ink); }
-
-/* Flow */
-.flow { display: grid; grid-template-columns: repeat(5, auto); align-items: center; gap: .75rem .5rem; margin: 2rem 0 1rem; }
-.node { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: .7rem .85rem; font-size: .95rem; line-height: 1.4; }
-.node b { display: block; }
-.node small { color: var(--muted); font-size: .85rem; }
-.arrow { color: var(--muted); text-align: center; font-family: var(--mono); }
-.out { border-left: 3px solid var(--c); }
-.out b { color: var(--c); }
-.c-drift { --c: var(--drift); } .c-unmanaged { --c: var(--unmanaged); } .c-idle { --c: var(--idle); }
-.merge { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; }
-.merge .node { flex: 1 1 12rem; }
-@media (max-width: 52rem) {
-  .flow { grid-template-columns: minmax(0, 1fr); }
-  .arrow:not(.down) { transform: rotate(90deg); }
-  .merge { flex-direction: column; align-items: stretch; }
-  .merge .node { flex: none; }
-}
-
-/* Terminal */
-.term { margin-top: 1.5rem; background: var(--term-bg); color: var(--term-ink); border-radius: 10px; border: 1px solid #2b3540; overflow: hidden; }
-.term-bar { display: flex; flex-wrap: wrap; align-items: center; gap: .25rem; padding: .5rem .6rem; border-bottom: 1px solid #2b3540; }
-[role="tab"] { background: none; border: 1px solid transparent; border-radius: 5px; color: var(--term-dim); font: .82rem/1.2 var(--mono); padding: .4rem .6rem; }
-[role="tab"]:hover { color: var(--term-ink); }
-[role="tab"][aria-selected="true"] { color: var(--term-ink); border-color: #3a4652; background: #1b232c; }
-.term :focus-visible { outline-color: var(--term-ps); }
-.ctl { margin-left: auto; display: flex; gap: .25rem; }
-.ctl button { background: none; border: 1px solid #3a4652; border-radius: 5px; color: var(--term-ink); font-size: .82rem; padding: .3rem .7rem; }
-.ctl button:hover { background: #1b232c; }
-.term pre { margin: 0; padding: 1.1rem 1.2rem 1.4rem; font-size: .8rem; line-height: 1.5; overflow-x: auto; min-height: 16rem; tab-size: 8; }
-.ps { color: var(--term-ps); user-select: none; }
-.typing .res { visibility: hidden; }
-.caret { display: none; width: .6em; height: 1.1em; vertical-align: text-bottom; background: var(--term-ink); }
-.typing .caret { display: inline-block; }
-.hint { font-size: .9rem; color: var(--muted); margin-top: .75rem; }
-.js [role="tabpanel"][hidden] { display: none; }
-html:not(.js) .ctl, html:not(.js) [role="tablist"] { display: none; }
-html:not(.js) [role="tabpanel"] + [role="tabpanel"] { border-top: 1px solid #2b3540; }
-
-/* Findings */
-.kinds { display: grid; grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); gap: 1rem; }
-.kind { background: var(--surface); border: 1px solid var(--line); border-top: 4px solid var(--c, var(--line)); border-radius: var(--radius); padding: 1.1rem 1.2rem .4rem; }
-.kind h4 { margin: 0 0 .4rem; font-size: 1.05rem; color: var(--c, var(--ink)); }
-.kind p, .kind li { font-size: .95rem; }
-.kind ul { padding-left: 1.1rem; margin: 0 0 1rem; }
-.left { display: grid; grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); gap: 0 2rem; }
-.left > div { border-left: 1px solid var(--line); padding-left: 1rem; }
-.left h4 { margin: 0 0 .4rem; font-size: 1.05rem; }
-.left p { font-size: .95rem; }
-.left pre { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: .7rem .85rem; font-size: .8rem; overflow-x: auto; }
-
-/* Quick start */
-.steps { counter-reset: s; list-style: none; padding: 0; max-width: 46rem; }
-.steps > li { counter-increment: s; position: relative; padding-left: 2.4rem; margin-bottom: 1.5rem; }
-.steps > li::before { content: counter(s); position: absolute; left: 0; top: .1rem; width: 1.6rem; height: 1.6rem; border-radius: 50%; border: 1px solid var(--line); text-align: center; font: .85rem/1.55rem var(--mono); color: var(--muted); }
-.steps pre { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: .7rem .9rem; overflow-x: auto; font-size: .85rem; margin: .5rem 0 0; }
-.steps .cm { color: var(--muted); }
-
-footer { border-top: 1px solid var(--line); padding: 2rem 0 3rem; font-size: .95rem; color: var(--muted); }
-footer ul { list-style: none; padding: 0; margin: 0 0 1rem; display: flex; flex-wrap: wrap; gap: .5rem 1.5rem; }
-footer a { color: var(--ink); }
-
-@media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after { animation: none !important; transition: none !important; }
-}
+.ps { color: var(--muted); user-select: none; }
+.c-drift { color: var(--drift); } .c-unmanaged { color: var(--unmanaged); } .c-idle { color: var(--idle); }
+.diagram { background: none; padding: 0; margin: 1.5rem 0; color: var(--muted); }
+.diagram b { font-weight: 600; }
+footer { margin-top: 3rem; padding-top: 1rem; border-top: 1px solid var(--line); font-size: .9rem; color: var(--muted); }
 </style>
-<script>document.documentElement.classList.add("js")</script>
 </head>
 <body>
 
-<header class="wrap">
-  <h1 class="mark"><span aria-hidden="true" class="ghost">tofu-drift</span>tofu-drift</h1>
-  <p class="pitch">Find what changed behind your OpenTofu state’s back, and what’s running in AWS that no state knows about.</p>
-  <p class="prose muted">Reports Drift on OpenTofu/Terraform-managed AWS resources, plus Unmanaged and Idle resources with a $/mo and kgCO₂/mo estimate on each. AWS only, read-only, no backend.</p>
-  <div class="install">
-    <pre id="install-cmd">brew install wardbox/tap/tofu-drift</pre>
-    <button class="copy" type="button" data-copy="install-cmd" hidden>Copy</button>
-  </div>
-  <p class="hint">Or <code>go install github.com/wardbox/tofu-drift/cmd/tofu-drift@latest</code>, or a binary from the <a href="https://github.com/wardbox/tofu-drift/releases">releases page</a>.</p>
+<header>
+  <h1>tofu-drift</h1>
+  <p>tells you what changed in aws outside of tofu, and what’s running in your account with no state behind it.</p>
+  <p class="muted">aws only. read-only, no backend, nothing to host. every stray resource gets a rough $/mo and kgCO₂/mo so you know what to kill first. works with opentofu and terraform state.</p>
+  <pre><span class="ps">$ </span>brew install wardbox/tap/tofu-drift</pre>
+  <p class="muted">or <code>go install github.com/wardbox/tofu-drift/cmd/tofu-drift@latest</code>, or grab a binary from <a href="https://github.com/wardbox/tofu-drift/releases">releases</a>.</p>
 </header>
 
 <main>
-<section aria-labelledby="how">
-  <div class="wrap">
-    <h2 id="how">How it works</h2>
-    <p class="prose muted">One Scan reads one state, one AWS account and one region. Nothing is written, locked or sent anywhere.</p>
-    <div class="flow" role="img" aria-label="State and a refresh-only tofu plan give Drift. Read-only AWS scanners are matched against state on Match Keys, giving Unmanaged and Idle resources; Derived Resources fold into their parent. Pricing and carbon estimates are added, then the report is written.">
-      <div class="node"><b>State</b><small><code>tofu state pull</code>, a file, or <code>s3://</code></small></div>
-      <div class="arrow" aria-hidden="true">→</div>
-      <div class="node"><b>Refresh-only plan</b><small><code>tofu plan -refresh-only</code>; the provider does the diffing</small></div>
-      <div class="arrow" aria-hidden="true">→</div>
-      <div class="node out c-drift"><b>Drift</b><small>out-of-band changes to Managed Resources</small></div>
+<h2 id="how">how it works</h2>
+<p>one scan looks at one state, one aws account and one region. it never writes, locks or sends anything.</p>
+<pre class="diagram" role="img" aria-label="your state and live aws get compared. out come three kinds of row: drift, unmanaged and idle.">your state ─┐
+            ├─ compare ─┬─ <b class="c-drift">drift</b>       tofu manages it, someone changed it anyway
+live aws ───┘           ├─ <b class="c-unmanaged">unmanaged</b>   in aws, in no state
+                        └─ <b class="c-idle">idle</b>        costs money, does nothing</pre>
+<p>drift comes from <code>tofu plan -refresh-only</code>, so you only get it when you run inside a root module. the provider does the diffing, tofu-drift prints what it says.</p>
+<p>unmanaged means no state has the resource’s id, bucket name or arn. idle is a fixed rule per type, like an unattached volume or a load balancer with no targets. both get a rough $/mo and kgCO₂/mo.</p>
+<p>stuff a resource made for itself, like an instance’s root volume, doesn’t get its own row. its cost rolls up into the parent. all of it prints as one table, or <code>--json</code>, and <code>--explain &lt;id&gt;</code> shows the math on one row.</p>
 
-      <div class="node"><b>Read-only AWS scanners</b><small>25 resource types, list and describe calls only</small></div>
-      <div class="arrow" aria-hidden="true">→</div>
-      <div class="node"><b>Match on Match Keys</b><small>instance ID, bucket name, ARN… against state. Derived Resources fold into their parent.</small></div>
-      <div class="arrow" aria-hidden="true">→</div>
-      <div class="node out c-unmanaged"><b>Unmanaged</b><small>in AWS, in no state</small><br><b class="c-idle" style="color:var(--c)">Idle</b><small>provably unused, managed or not</small></div>
+<h2 id="try">what it looks like</h2>
+<p>real output from our throwaway sandbox in us-west-1, after a script messed with it on purpose. wide tables scroll sideways.</p>
 
-      <div class="merge">
-        <div class="arrow down" aria-hidden="true">↓</div>
-        <div class="node"><b>Estimates</b><small>$/mo from pricing tables shipped in the binary; kgCO₂/mo by the Cloud Carbon Footprint method</small></div>
-        <div class="arrow" aria-hidden="true">→</div>
-        <div class="node"><b>Report</b><small>a table, <code>--json</code>, or <code>--explain</code> for one Finding</small></div>
-      </div>
-    </div>
-  </div>
-</section>
-
-<section aria-labelledby="try">
-  <div class="wrap">
-    <h2 id="try">What using it looks like</h2>
-    <p class="prose muted">Real output from a scan of the project’s throwaway sandbox stack in us-west-1, after a script planted drift and stray resources.</p>
-    <div class="term">
-      <div class="term-bar">
-        <div role="tablist" aria-label="Commands">
-          <button role="tab" type="button" id="t-scan" aria-controls="p-scan" aria-selected="true">scan</button>
-          <button role="tab" type="button" id="t-unm" aria-controls="p-unm" aria-selected="false" tabindex="-1">unmanaged</button>
-          <button role="tab" type="button" id="t-xnat" aria-controls="p-xnat" aria-selected="false" tabindex="-1">explain NAT</button>
-          <button role="tab" type="button" id="t-xsg" aria-controls="p-xsg" aria-selected="false" tabindex="-1">explain drift</button>
-          <button role="tab" type="button" id="t-imp" aria-controls="p-imp" aria-selected="false" tabindex="-1">import-gen</button>
-        </div>
-        <div class="ctl"><button type="button" id="replay">Replay</button><button type="button" id="skip">Skip</button></div>
-      </div>
-<div role="tabpanel" id="p-scan" aria-labelledby="t-scan"><pre tabindex="0"><span class="ps">$ </span><span class="cmd">tofu-drift scan</span><span class="caret"></span>
-<span class="res">Drift
+<pre class="wide"><span class="ps">$ </span>tofu-drift scan
+Drift
 ADDRESS                       TYPE                      CHANGED
 aws_cloudwatch_log_group.app  aws_cloudwatch_log_group  1 (retention_in_days)
 aws_iam_role.lambda           aws_iam_role              1 (description)
@@ -190,19 +78,11 @@ aws_eip          eipalloc-0a3d468d4f54332a3                                     
 aws_ebs_volume   vol-098b6bffba632b1af                                                                            us-west-1  tdsbx-stray-volume  unmanaged+idle  0d   0.10   0.0       -
 aws_ami          ami-0bd49cfac2efd7bac                                                                            us-west-1  tdsbx-ami           idle            0d   0.06   0.0       -
 
-Unmanaged: $42/mo · Idle: $22/mo · ~0.0 kgCO₂/mo (≈ 0.00 trans-Atlantic flights)</span></pre></div>
-<div role="tabpanel" id="p-unm" aria-labelledby="t-unm" hidden><pre tabindex="0"><span class="ps">$ </span><span class="cmd">tofu-drift unmanaged --sort cost</span><span class="caret"></span>
-<span class="res">Unmanaged &amp; idle
-TYPE             ID                                                                                               REGION     NAME                STATUS          AGE  $/MO   kgCO₂/MO  NOTE
-aws_nat_gateway  nat-070535f9aa983d518                                                                            us-west-1  tdsbx-stray-nat     unmanaged       0d   38.69  0.0       -
-aws_lb           arn:aws:elasticloadbalancing:us-west-1:123456789012:loadbalancer/app/tdsbx-alb/a0fb401e97734c75  us-west-1  tdsbx-alb           idle            0d   18.40  0.0       -
-aws_eip          eipalloc-0a3d468d4f54332a3                                                                       us-west-1  tdsbx-stray-eip     unmanaged+idle  -    3.65   0.0       -
-aws_ebs_volume   vol-098b6bffba632b1af                                                                            us-west-1  tdsbx-stray-volume  unmanaged+idle  0d   0.10   0.0       -
-aws_ami          ami-0bd49cfac2efd7bac                                                                            us-west-1  tdsbx-ami           idle            0d   0.06   0.0       -
+Unmanaged: $42/mo · Idle: $22/mo · ~0.0 kgCO₂/mo (≈ 0.00 trans-Atlantic flights)</pre>
 
-Unmanaged: $42/mo · Idle: $22/mo · ~0.0 kgCO₂/mo (≈ 0.00 trans-Atlantic flights)</span></pre></div>
-<div role="tabpanel" id="p-xnat" aria-labelledby="t-xnat" hidden><pre tabindex="0"><span class="ps">$ </span><span class="cmd">tofu-drift scan --explain nat-070535f9aa983d518</span><span class="caret"></span>
-<span class="res">type:     aws_nat_gateway
+<p>the NAT gateway’s elastic ip has no row of its own, its $3.65 is inside the NAT’s $38.69. <code>--explain</code> shows the math:</p>
+<pre class="wide"><span class="ps">$ </span>tofu-drift scan --explain nat-070535f9aa983d518
+type:     aws_nat_gateway
 id:       nat-070535f9aa983d518
 arn:      -
 tags:     Name=tdsbx-stray-nat, tofu-drift-sandbox=tdsbx, tofu-drift-sandbox-planted=true
@@ -212,14 +92,18 @@ idle:     -
 cost:     $0.048/h × 730 h = $35.04/mo
           + eipalloc-0e418919abec57172: $0.005/h × 730 h = $3.65/mo
           = $38.69/mo (estimate)
-carbon:   ~0.0 kgCO₂/mo (estimate)</span></pre></div>
-<div role="tabpanel" id="p-xsg" aria-labelledby="t-xsg" hidden><pre tabindex="0"><span class="ps">$ </span><span class="cmd">tofu-drift scan --explain aws_security_group.main</span><span class="caret"></span>
-<span class="res">aws_security_group.main (aws_security_group): 1 attributes changed out of band
+carbon:   ~0.0 kgCO₂/mo (estimate)</pre>
+
+<p>on a drift row it shows before and after. this one’s a port 22 rule somebody added in the console:</p>
+<pre class="wide"><span class="ps">$ </span>tofu-drift scan --explain aws_security_group.main
+aws_security_group.main (aws_security_group): 1 attributes changed out of band
   ingress
     - [{"cidr_blocks":["10.42.0.0/16"],"description":"HTTP inside the VPC","from_port":80,"ipv6_cidr_blocks":[],"prefix_list_ids":[],"protocol":"tcp","security_groups":[],"self":false,"to_port":80}]
-    + [{"cidr_blocks":["0.0.0.0/0"],"description":"","from_port":22,"ipv6_cidr_blocks":[],"prefix_list_ids":[],"protocol":"tcp","security_groups":[],"self":false,"to_port":22},{"cidr_blocks":["10.42.0.0/16"],"description":"HTTP inside the VPC","from_port":80,"ipv6_cidr_blocks":[],"prefix_list_ids":[],"protocol":"tcp","security_groups":[],"self":false,"to_port":80}]</span></pre></div>
-<div role="tabpanel" id="p-imp" aria-labelledby="t-imp" hidden><pre tabindex="0"><span class="ps">$ </span><span class="cmd">tofu-drift import-gen --ids vol-098b6bffba632b1af,eipalloc-0a3d468d4f54332a3</span><span class="caret"></span>
-<span class="res"># Generated by tofu-drift. Addresses are placeholders: rename them before apply.
+    + [{"cidr_blocks":["0.0.0.0/0"],"description":"","from_port":22,"ipv6_cidr_blocks":[],"prefix_list_ids":[],"protocol":"tcp","security_groups":[],"self":false,"to_port":22},{"cidr_blocks":["10.42.0.0/16"],"description":"HTTP inside the VPC","from_port":80,"ipv6_cidr_blocks":[],"prefix_list_ids":[],"protocol":"tcp","security_groups":[],"self":false,"to_port":80}]</pre>
+
+<p>want to keep the stray stuff? <code>import-gen</code> writes the import blocks:</p>
+<pre class="wide"><span class="ps">$ </span>tofu-drift import-gen --ids vol-098b6bffba632b1af,eipalloc-0a3d468d4f54332a3
+# Generated by tofu-drift. Addresses are placeholders: rename them before apply.
 # Then run: tofu plan -generate-config-out=generated.tf
 
 import {
@@ -230,53 +114,36 @@ import {
 import {
   to = aws_eip.tdsbx-stray-eip
   id = "eipalloc-0a3d468d4f54332a3"
-}</span></pre></div>
-    </div>
-    <p class="hint">Wide tables scroll sideways. The NAT gateway’s own Elastic IP is a Derived Resource, so it sits inside the NAT row’s $38.69 instead of getting a row. The security group’s drift is a port 22 rule added in the console.</p>
-  </div>
-</section>
+}</pre>
+<p><code>tofu-drift unmanaged --sort cost</code> prints only the second table, sorted by cost, or by <code>type</code> or <code>age</code>.</p>
 
-<section aria-labelledby="means">
-  <div class="wrap">
-    <h2 id="means">What each finding means</h2>
-    <p class="prose muted">Every row is one Finding for one resource. Its STATUS says which of these it carries.</p>
-    <h3>Three kinds of Finding</h3>
-    <div class="kinds">
-      <article class="kind c-drift">
-        <h4>Drift</h4>
-        <p>A Managed Resource was changed outside OpenTofu: a console edit, a script, another tool. The provider reports it during a refresh-only plan; tofu-drift only renders it. Drift is never costed and never ignored.</p>
-      </article>
-      <article class="kind c-unmanaged">
-        <h4>Unmanaged</h4>
-        <p>A live AWS resource whose ID or ARN appears in no scanned state. Someone made it by hand, or its state was lost. <code>import-gen</code> writes the <code>import</code> blocks to adopt it.</p>
-      </article>
-      <article class="kind c-idle">
-        <h4>Idle</h4>
-        <p>Provably unused by a structural rule, whether managed or not:</p>
-        <ul>
-          <li>EBS volume unattached</li>
-          <li>Elastic IP unassociated</li>
-          <li>network interface unattached</li>
-          <li>ALB/NLB whose target groups are all empty; classic LB with no instances</li>
-          <li>EBS snapshot whose source volume is gone</li>
-          <li>AMI no live instance was launched from</li>
-          <li>RDS instance stopped</li>
-        </ul>
-      </article>
-    </div>
-    <h3>What stays out of the report</h3>
-    <div class="left">
-      <div>
-        <h4>Default Furniture</h4>
-        <p>What AWS creates in every account or VPC without being asked: the default VPC and its subnets, each VPC’s default security group and main route table, service-linked IAM roles, the <code>default</code> ECS cluster. Hidden unless you pass <code>--include-defaults</code>.</p>
-      </div>
-      <div>
-        <h4>Derived Resources</h4>
-        <p>Resources another resource created: an instance’s launch-time volumes, a NAT gateway’s Elastic IPs, an AMI’s snapshots, an Auto Scaling group’s instances. They never get a row. Their cost folds into the parent’s.</p>
-      </div>
-      <div>
-        <h4>Ignore Rules</h4>
-        <p>A <code>tofu-drift.toml</code> in the current directory drops matching Unmanaged and Idle rows by tag, type or ARN glob. Every field in one rule must match.</p>
+<h2 id="means">what the rows mean</h2>
+<p>one row per resource. STATUS tells you which of these it hit.</p>
+
+<h3 class="c-drift">drift</h3>
+<p>tofu manages it and something changed it anyway. a console edit, a script, some other tool. the aws provider finds it during a refresh-only plan and tofu-drift prints it. drift never gets a price and ignore rules won’t hide it.</p>
+
+<h3 class="c-unmanaged">unmanaged</h3>
+<p>exists in aws, no state has its id or arn. somebody clicked it into existence or the state got lost. <code>import-gen</code> writes the <code>import</code> blocks to bring it under tofu.</p>
+
+<h3 class="c-idle">idle</h3>
+<p>unused by one of these rules, managed or not</p>
+<ul>
+  <li>ebs volume not attached to anything</li>
+  <li>elastic ip not associated</li>
+  <li>network interface not attached</li>
+  <li>alb/nlb with empty target groups, classic lb with no instances</li>
+  <li>ebs snapshot, source volume deleted</li>
+  <li>ami nobody launched an instance from</li>
+  <li>rds instance stopped</li>
+</ul>
+
+<h3>left out on purpose</h3>
+<p>stuff aws makes in every account or vpc without asking stays hidden: the default vpc and its subnets, default security groups, main route tables, service-linked iam roles, the <code>default</code> ecs cluster. pass <code>--include-defaults</code> to see it.</p>
+<p>things another resource made for itself, like an instance’s launch volumes, a NAT gateway’s elastic ips, an ami’s snapshots or an auto scaling group’s instances, get no row. the cost goes on the parent.</p>
+
+<h3>ignore rules</h3>
+<p>put a <code>tofu-drift.toml</code> where you run it to hide unmanaged and idle rows by tag, type or arn glob. a rule with more than one field needs all of them to match.</p>
 <pre>[[ignore]]
 tag = "ManagedBy=other"
 
@@ -285,112 +152,37 @@ type = "aws_s3_bucket"
 
 [[ignore]]
 arn = "arn:aws:iam::*:role/legacy-*"</pre>
-      </div>
-    </div>
-  </div>
-</section>
 
-<section aria-labelledby="start">
-  <div class="wrap">
-    <h2 id="start">Quick start</h2>
-    <ol class="steps">
-      <li>
-        <b>Run it inside an OpenTofu root module</b> for the full report. State comes from <code>tofu state pull</code>, so any backend and the current workspace work.
-<pre>cd path/to/root-module
+<h2 id="start">quick start</h2>
+<ol>
+  <li>
+    <p>run it in a tofu root module for the full report. state comes from <code>tofu state pull</code>, so whatever backend and workspace you’re on works.</p>
+    <pre>cd path/to/root-module
 tofu-drift scan</pre>
-      </li>
-      <li>
-        <b>Or point it at a state from anywhere.</b> With <code>--state</code> there is no module to plan against, so Drift is skipped and you get Unmanaged and Idle only.
-<pre>tofu-drift scan --state s3://&lt;bucket&gt;/&lt;key&gt;
+  </li>
+  <li>
+    <p>or point it at a state file from anywhere. with <code>--state</code> there’s no module to plan against, so no drift. you get unmanaged and idle only.</p>
+    <pre>tofu-drift scan --state s3://&lt;bucket&gt;/&lt;key&gt;
 tofu-drift scan --state terraform.tfstate</pre>
-      </li>
-      <li>
-        <b>Choose the account and region</b> with the usual AWS profile and region, or override them.
-<pre>tofu-drift scan --profile &lt;profile&gt; --region us-west-1</pre>
-      </li>
-      <li>
-        <b>Feed it to scripts or CI.</b> <code>--json</code> works on every command. Exit code is 0 with no Findings, 1 with any, 2 on error.
-<pre>tofu-drift scan --json &gt; report.json</pre>
-      </li>
-      <li>
-        <b>Grant read-only access.</b> <a href="https://github.com/wardbox/tofu-drift/blob/main/iam-policy.json"><code>iam-policy.json</code></a> lists every AWS action a scan calls. Run without credentials and tofu-drift prints it and exits 2.
-      </li>
-    </ol>
-  </div>
-</section>
+  </li>
+  <li>
+    <p>it uses your normal aws profile and region unless you override them.</p>
+    <pre>tofu-drift scan --profile &lt;profile&gt; --region us-west-1</pre>
+  </li>
+  <li>
+    <p><code>--json</code> works on every command. exit code 0 means nothing found, 1 means something, 2 means it broke.</p>
+    <pre>tofu-drift scan --json &gt; report.json</pre>
+  </li>
+  <li>
+    <p>give it read-only access. <a href="https://github.com/wardbox/tofu-drift/blob/main/iam-policy.json"><code>iam-policy.json</code></a> lists every aws call a scan makes. run it with no credentials and it prints the policy and exits 2.</p>
+  </li>
+</ol>
 </main>
 
 <footer>
-  <div class="wrap">
-    <ul>
-      <li><a href="https://github.com/wardbox/tofu-drift">GitHub repository</a></li>
-      <li><a href="https://github.com/wardbox/tofu-drift#readme">README and coverage table</a></li>
-      <li><a href="https://www.cloudcarbonfootprint.org/docs/methodology">Cloud Carbon Footprint methodology</a></li>
-    </ul>
-    <p>Every $/mo and kgCO₂/mo figure is an estimate for ranking, not billing. Carbon follows the Cloud Carbon Footprint methodology. Apache-2.0.</p>
-  </div>
+  <p><a href="https://github.com/wardbox/tofu-drift">github</a> · <a href="https://github.com/wardbox/tofu-drift#readme">readme and what it covers</a> · <a href="https://www.cloudcarbonfootprint.org/docs/methodology">cloud carbon footprint methodology</a></p>
+  <p>every $/mo and kgCO₂ number is an estimate for ranking stuff, not a bill. carbon uses the cloud carbon footprint method. apache-2.0.</p>
 </footer>
 
-<script>
-(() => {
-  const reduce = matchMedia("(prefers-reduced-motion: reduce)");
-  const tabs = [...document.querySelectorAll('[role="tab"]')];
-  let timer, finish = () => {};
-
-  // Types the command, pauses like a scan would, then shows the output.
-  function play(panel) {
-    finish();
-    const pre = panel.querySelector("pre"), cmd = pre.querySelector(".cmd");
-    const text = cmd.dataset.text ??= cmd.textContent;
-    finish = () => { clearTimeout(timer); cmd.textContent = text; pre.classList.remove("typing"); panel.removeAttribute("aria-busy"); };
-    if (reduce.matches) return finish();
-    panel.setAttribute("aria-busy", "true");
-    pre.classList.add("typing");
-    let i = 0;
-    const step = () => {
-      cmd.textContent = text.slice(0, i++);
-      timer = i <= text.length ? setTimeout(step, 28 + Math.random() * 40) : setTimeout(finish, 550);
-    };
-    step();
-  }
-
-  function select(tab, focus) {
-    for (const t of tabs) {
-      const on = t === tab;
-      t.setAttribute("aria-selected", on);
-      t.tabIndex = on ? 0 : -1;
-      document.getElementById(t.getAttribute("aria-controls")).hidden = !on;
-    }
-    if (focus) tab.focus();
-    play(document.getElementById(tab.getAttribute("aria-controls")));
-  }
-
-  tabs.forEach((t, i) => {
-    t.addEventListener("click", () => select(t));
-    t.addEventListener("keydown", e => {
-      const n = { ArrowRight: i + 1, ArrowLeft: i - 1, Home: 0, End: tabs.length - 1 }[e.key];
-      if (n === undefined) return;
-      e.preventDefault();
-      select(tabs[(n + tabs.length) % tabs.length], true);
-    });
-  });
-  const current = () => document.querySelector('[role="tabpanel"]:not([hidden])');
-  document.getElementById("replay").addEventListener("click", () => play(current()));
-  document.getElementById("skip").addEventListener("click", () => finish());
-
-  // First replay when the terminal scrolls into view.
-  const term = document.querySelector(".term");
-  new IntersectionObserver((es, o) => {
-    if (es[0].isIntersecting) { o.disconnect(); play(current()); }
-  }, { threshold: .4 }).observe(term);
-
-  const copy = document.querySelector(".copy");
-  if (navigator.clipboard) {
-    copy.hidden = false;
-    copy.addEventListener("click", () => navigator.clipboard.writeText(document.getElementById(copy.dataset.copy).textContent)
-      .then(() => { copy.textContent = "Copied"; setTimeout(() => copy.textContent = "Copy", 1500); }, () => {}));
-  }
-})();
-</script>
 </body>
 </html>
