@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/wardbox/tofu-drift/internal/plan"
 	"github.com/wardbox/tofu-drift/internal/scan"
 	"github.com/wardbox/tofu-drift/internal/state"
 )
@@ -140,5 +141,55 @@ func TestApproxMarked(t *testing.T) {
 	}
 	if !strings.Contains(out.String(), "≈60.74") {
 		t.Errorf("table missing ≈ price:\n%s", out.String())
+	}
+}
+
+func TestAddDrift(t *testing.T) {
+	r := New(Scan{Region: "us-east-1"}, []state.Resource{
+		{Address: "aws_ebs_volume.data", Type: "aws_ebs_volume", Attributes: map[string]any{"id": "vol-mi"}},
+	})
+	r.AddLive([]scan.LiveResource{{Type: "aws_ebs_volume", Key: "vol-mi", Class: "gp3", SizeGB: 10, Idle: "unattached"}}, time.Now())
+	r.AddDrift([]plan.Drift{
+		{Address: "aws_instance.web", Type: "aws_instance",
+			Before: map[string]any{"a": 1.0, "b": 1.0, "c": 1.0, "d": 1.0, "same": 1.0},
+			After:  map[string]any{"a": 2.0, "b": 2.0, "c": 2.0, "d": 2.0, "same": 1.0}},
+		{Address: "aws_s3_bucket.logs", Type: "aws_s3_bucket", Deleted: true, Before: map[string]any{"id": "logs"}},
+		// managed idle volume that also drifted: one Finding carrying both
+		{Address: "aws_ebs_volume.data", Type: "aws_ebs_volume",
+			Before: map[string]any{"size": 10.0}, After: map[string]any{"size": 20.0}},
+	})
+	if len(r.Findings) != 3 {
+		t.Fatalf("findings: %+v", r.Findings)
+	}
+	vol := r.Findings[0]
+	if vol.ID != "vol-mi" || vol.Idle == nil || vol.Drift == nil || fmt.Sprint(vol.Drift.Changed) != "[size]" {
+		t.Errorf("merged finding: %+v", vol)
+	}
+	web := r.Findings[1]
+	if web.ID != "aws_instance.web" || web.Address != "aws_instance.web" || web.Unmanaged || web.Idle != nil || web.USDMo != 0 {
+		t.Errorf("drift finding: %+v", web)
+	}
+	if r.Totals.UnmanagedUSDMo != 0 || r.Totals.IdleUSDMo != 0.8 {
+		t.Errorf("drift must not add to totals: %+v", r.Totals)
+	}
+
+	var out bytes.Buffer
+	if err := r.WriteTable(&out); err != nil {
+		t.Fatal(err)
+	}
+	want := `Drift
+ADDRESS              TYPE            CHANGED
+aws_ebs_volume.data  aws_ebs_volume  1 (size)
+aws_instance.web     aws_instance    4 (a, b, c, …)
+aws_s3_bucket.logs   aws_s3_bucket   deleted
+
+Unmanaged & idle
+TYPE            ID      NAME  STATUS  AGE  $/MO  kgCO₂/MO
+aws_ebs_volume  vol-mi  -     idle    -    0.80  0.0
+
+Unmanaged: $0/mo · Idle: $1/mo · ~0.0 kgCO₂/mo (≈ 0.00 trans-Atlantic flights)
+`
+	if out.String() != want {
+		t.Errorf("table:\n%s\nwant:\n%s", out.String(), want)
 	}
 }

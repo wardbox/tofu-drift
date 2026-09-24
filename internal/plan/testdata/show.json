@@ -1,0 +1,64 @@
+{
+  "format_version": "1.2",
+  "terraform_version": "1.12.0",
+  "planned_values": {
+    "root_module": {}
+  },
+  "resource_drift": [
+    {
+      "address": "aws_db_instance.main",
+      "mode": "managed",
+      "type": "aws_db_instance",
+      "name": "main",
+      "provider_name": "registry.opentofu.org/hashicorp/aws",
+      "change": {
+        "actions": ["update"],
+        "before": {
+          "allocated_storage": 20,
+          "engine": "postgres",
+          "id": "db-1",
+          "instance_class": "db.t3.micro",
+          "password": "hunter2",
+          "tags": {"Name": "main"}
+        },
+        "after": {
+          "allocated_storage": 20,
+          "engine": "postgres",
+          "id": "db-1",
+          "instance_class": "db.t3.large",
+          "password": "hunter3",
+          "tags": {"Name": "main", "Owner": "bob"}
+        },
+        "after_unknown": {},
+        "before_sensitive": {"password": true, "tags": {}},
+        "after_sensitive": {"password": true, "tags": {}}
+      }
+    },
+    {
+      "address": "local_sensitive_file.s",
+      "mode": "managed",
+      "type": "local_sensitive_file",
+      "name": "s",
+      "provider_name": "registry.opentofu.org/hashicorp/local",
+      "change": {
+        "actions": ["delete"],
+        "before": {
+          "content": "secret",
+          "content_base64": null,
+          "content_md5": "5ebe2294ecd0e0f08eab7690d2a6ee69",
+          "directory_permission": "0700",
+          "file_permission": "0700",
+          "filename": "./s.txt",
+          "id": "e5e9fa1ba31ecd1ae84f75caaa474f3a663f05f4",
+          "source": null
+        },
+        "after": null,
+        "after_unknown": {},
+        "before_sensitive": {"content": true, "content_base64": true},
+        "after_sensitive": false
+      }
+    }
+  ],
+  "timestamp": "2026-09-24T00:18:37Z",
+  "errored": false
+}
