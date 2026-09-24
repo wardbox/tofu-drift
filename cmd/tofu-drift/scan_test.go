@@ -5,6 +5,9 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -12,6 +15,7 @@ import (
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/spf13/cobra"
 	"github.com/wardbox/tofu-drift/internal/scan"
 )
@@ -330,5 +334,36 @@ func TestScanSandbox(t *testing.T) {
 		if strings.Contains(out, id) {
 			t.Errorf("%s must not be a row:\n%s", id, out)
 		}
+	}
+}
+
+// A state bucket outside the scan region answers 301 PermanentRedirect with
+// its region in X-Amz-Bucket-Region; the read retries there.
+func TestGetStateOtherRegion(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !strings.Contains(r.Header.Get("Authorization"), "/eu-west-2/s3/") {
+			w.Header().Set("X-Amz-Bucket-Region", "eu-west-2")
+			w.WriteHeader(http.StatusMovedPermanently)
+			_, _ = io.WriteString(w, `<Error><Code>PermanentRedirect</Code></Error>`)
+			return
+		}
+		_, _ = io.WriteString(w, "state")
+	}))
+	defer srv.Close()
+	c := s3.New(s3.Options{
+		Region:       "us-west-1",
+		BaseEndpoint: aws.String(srv.URL),
+		UsePathStyle: true,
+		Credentials: aws.CredentialsProviderFunc(func(context.Context) (aws.Credentials, error) {
+			return aws.Credentials{AccessKeyID: "id", SecretAccessKey: "secret"}, nil
+		}),
+	})
+	body, err := getState(context.Background(), c, "bucket", "key")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = body.Close() }()
+	if b, _ := io.ReadAll(body); string(b) != "state" {
+		t.Errorf("got %q", b)
 	}
 }
