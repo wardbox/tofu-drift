@@ -1,5 +1,17 @@
 # tofu-drift
 
+Compares an OpenTofu/Terraform state against a live AWS account: reports Drift on managed resources, finds Unmanaged and Idle resources, and estimates what they cost in $/mo and kgCO₂/mo. AWS only, read-only, no backend.
+
+## Install
+
+```sh
+brew install wardbox/tap/tofu-drift
+# or
+go install github.com/wardbox/tofu-drift/cmd/tofu-drift@latest
+```
+
+Release binaries for Linux and macOS (amd64, arm64) are on the [releases page](https://github.com/wardbox/tofu-drift/releases).
+
 ## Permissions
 
 tofu-drift is read-only. [`iam-policy.json`](iam-policy.json) lists every AWS action a scan calls, and a test keeps it in step with the scanners. Run without credentials and tofu-drift prints that policy and exits 2. Reading state from `s3://` additionally needs `s3:GetObject` on the state object.
