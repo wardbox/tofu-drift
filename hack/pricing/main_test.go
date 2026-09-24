@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 )
@@ -51,6 +52,45 @@ func TestCollect(t *testing.T) {
 	}
 	if got := tables.EBS["us-east-1"]["gp3"]; got != 0.08 {
 		t.Errorf("gp3 rate: %v (want region, not local zone)", got)
+	}
+}
+
+// Real row shapes from the eu-west-2 offer files, trimmed to the columns used.
+const flatCSV = `"FormatVersion","v1.0"
+"Disclaimer","x"
+"Publication Date","2026-09-11T12:45:44Z"
+"Version","20260911124544"
+"OfferCode","mixed"
+"TermType","Unit","PricePerUnit","Product Family","usageType","operation","Location Type"
+"OnDemand","Hrs","0.0059","Load Balancer-Application","EUW2-TS-LoadBalancerUsage","LoadBalancing:Application","AWS Region"
+"OnDemand","Hrs","0.02646","Load Balancer-Application","EUW2-LoadBalancerUsage","LoadBalancing:Application","AWS Region"
+"OnDemand","Hrs","0.02646","Load Balancer-Application","EUW2-Outposts-LoadBalancerUsage","LoadBalancing:Application","AWS Outposts"
+"OnDemand","Hrs","0.0294","Load Balancer","EUW2-LoadBalancerUsage","LoadBalancing","AWS Region"
+"OnDemand","Hrs","0.02646","Load Balancer-Network","EUW2-LoadBalancerUsage","LoadBalancing:Network","AWS Region"
+"OnDemand","Hrs","0.0147","Load Balancer-Gateway","EUW2-LoadBalancerUsage","LoadBalancing:Gateway","AWS Region"
+"OnDemand","Hrs","0.008","","EUW2-LCUUsage","LoadBalancing:Application","AWS Region"
+"OnDemand","Hrs","0.005","","EUW2-PublicIPv4:InUseAddress","","AWS Region"
+"OnDemand","Hrs","0.005","","EUW2-PublicIPv4:IdleAddress","","AWS Region"
+"OnDemand","Hrs","0.05","NAT Gateway","EUW2-NatGateway-Hours","NatGateway","AWS Region"
+"OnDemand","Hrs","0.07","NAT Gateway","EUW2-RegionalNatGateway-Hours","RegionalNatGateway","AWS Region"
+"OnDemand","GB","0.05","NAT Gateway","EUW2-NatGateway-Bytes","NatGateway","AWS Region"
+"OnDemand","GB-Mo","0.053","Storage Snapshot","EUW2-EBS:SnapshotUsage","","AWS Region"
+"OnDemand","GB-Mo","0.01325","Storage Snapshot","EUW2-EBS:SnapshotArchiveStorage","","AWS Region"
+`
+
+func TestCollectFlat(t *testing.T) {
+	tables := newTables()
+	for _, collect := range []func(row) error{tables.ec2("eu-west-2"), tables.elb("eu-west-2"), tables.vpc("eu-west-2")} {
+		if err := readOffer(strings.NewReader(flatCSV), collect); err != nil {
+			t.Fatal(err)
+		}
+	}
+	want := map[string]float64{
+		"alb_hour": 0.02646, "nlb_hour": 0.02646, "clb_hour": 0.0294,
+		"eip_hour": 0.005, "nat_gateway_hour": 0.05, "snapshot_gb_month": 0.053,
+	}
+	if got := tables.Flat["eu-west-2"]; fmt.Sprint(got) != fmt.Sprint(want) {
+		t.Errorf("flat: %v, want %v", got, want)
 	}
 }
 

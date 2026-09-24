@@ -36,6 +36,8 @@ func main() {
 			"AmazonEC2":         t.ec2(region),
 			"AmazonRDS":         t.rds(region),
 			"AmazonElastiCache": t.elasticache(region),
+			"AWSELB":            t.elb(region),
+			"AmazonVPC":         t.vpc(region),
 		} {
 			log.Printf("%s %s", offer, region)
 			if err := fetch(fmt.Sprintf(offerURL, offer, region), collect); err != nil {
@@ -46,25 +48,31 @@ func main() {
 	if err := writeJSON(outDir+"instances.json", t); err != nil {
 		log.Fatal(err)
 	}
-	// ebs.json covers more regions and types than the offer files (io2 is
-	// absent from them); refresh what we fetched, keep the rest.
-	ebs := map[string]map[string]float64{}
-	b, err := os.ReadFile(outDir + "ebs.json")
-	if err != nil {
-		log.Fatal(err)
-	}
-	if err := json.Unmarshal(b, &ebs); err != nil {
-		log.Fatal(err)
-	}
-	for region, rates := range t.EBS {
-		if ebs[region] == nil {
-			ebs[region] = map[string]float64{}
+	// ebs.json and flat.json cover more regions than we fetch (and ebs.json
+	// io2, absent from the offer files); refresh what we fetched, keep the rest.
+	for file, fetched := range map[string]map[string]map[string]float64{"ebs.json": t.EBS, "flat.json": t.Flat} {
+		if err := merge(outDir+file, fetched); err != nil {
+			log.Fatal(err)
 		}
-		maps.Copy(ebs[region], rates)
 	}
-	if err := writeJSON(outDir+"ebs.json", ebs); err != nil {
-		log.Fatal(err)
+}
+
+func merge(path string, fetched map[string]map[string]float64) error {
+	all := map[string]map[string]float64{}
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return err
 	}
+	if err := json.Unmarshal(b, &all); err != nil {
+		return err
+	}
+	for region, rates := range fetched {
+		if all[region] == nil {
+			all[region] = map[string]float64{}
+		}
+		maps.Copy(all[region], rates)
+	}
+	return writeJSON(path, all)
 }
 
 func fetch(url string, collect func(row) error) error {
@@ -122,17 +130,23 @@ func readOffer(r io.Reader, collect func(row) error) error {
 	}
 }
 
-// tables is instances.json; EBS goes to ebs.json.
+// tables is instances.json; EBS goes to ebs.json, Flat to flat.json.
 type tables struct {
 	// VCPU per instance class; classes are unique across services by prefix (db., cache.).
 	VCPU map[string]int `json:"vcpu"`
 	// Hourly is on-demand USD per hour by region, then instance class.
 	Hourly map[string]map[string]float64 `json:"hourly"`
 	EBS    map[string]map[string]float64 `json:"-"`
+	Flat   map[string]map[string]float64 `json:"-"`
 }
 
 func newTables() *tables {
-	return &tables{VCPU: map[string]int{}, Hourly: map[string]map[string]float64{}, EBS: map[string]map[string]float64{}}
+	return &tables{
+		VCPU:   map[string]int{},
+		Hourly: map[string]map[string]float64{},
+		EBS:    map[string]map[string]float64{},
+		Flat:   map[string]map[string]float64{},
+	}
 }
 
 // onDemand reports whether r is a plain on-demand price in an AWS Region
@@ -143,8 +157,8 @@ func onDemand(r row) bool {
 		!strings.Contains(r["usageType"], "ExtendedSupport")
 }
 
-// ec2 collects Linux, shared-tenancy, on-demand instance hours and EBS
-// storage rates.
+// ec2 collects Linux, shared-tenancy, on-demand instance hours, EBS storage
+// and snapshot rates, and NAT gateway hours.
 func (t *tables) ec2(region string) func(row) error {
 	return func(r row) error {
 		switch {
@@ -154,6 +168,39 @@ func (t *tables) ec2(region string) func(row) error {
 			return t.instance(region, r)
 		case r["Product Family"] == "Storage" && r["Unit"] == "GB-Mo" && r["Volume API Name"] != "":
 			return set(t.EBS, region, r["Volume API Name"], r["PricePerUnit"])
+		case r["Product Family"] == "Storage Snapshot" && strings.HasSuffix(r["usageType"], "EBS:SnapshotUsage"):
+			return set(t.Flat, region, "snapshot_gb_month", r["PricePerUnit"])
+		// Zonal NAT gateways; operation RegionalNatGateway is the newer regional kind.
+		case r["Product Family"] == "NAT Gateway" && r["Unit"] == "Hrs" && r["operation"] == "NatGateway":
+			return set(t.Flat, region, "nat_gateway_hour", r["PricePerUnit"])
+		}
+		return nil
+	}
+}
+
+// lbRates names the flat rate for each load balancer operation.
+var lbRates = map[string]string{
+	"LoadBalancing:Application": "alb_hour",
+	"LoadBalancing:Network":     "nlb_hour",
+	"LoadBalancing":             "clb_hour",
+}
+
+// elb collects ALB, NLB and CLB hours, excluding the trust-store (TS-) rate.
+func (t *tables) elb(region string) func(row) error {
+	return func(r row) error {
+		if k, ok := lbRates[r["operation"]]; ok && onDemand(r) && r["Unit"] == "Hrs" &&
+			strings.HasSuffix(r["usageType"], "LoadBalancerUsage") && !strings.Contains(r["usageType"], "TS-") {
+			return set(t.Flat, region, k, r["PricePerUnit"])
+		}
+		return nil
+	}
+}
+
+// vpc collects the public IPv4 hourly rate an Elastic IP pays.
+func (t *tables) vpc(region string) func(row) error {
+	return func(r row) error {
+		if onDemand(r) && strings.HasSuffix(r["usageType"], "PublicIPv4:IdleAddress") {
+			return set(t.Flat, region, "eip_hour", r["PricePerUnit"])
 		}
 		return nil
 	}

@@ -20,11 +20,26 @@ var keyFor = map[string]func(attrs map[string]any) string{
 	"aws_default_subnet":         attr("id"),
 	"aws_default_route_table":    attr("id"),
 	"aws_default_security_group": attr("id"),
+	"aws_eip":                    attr("id"),
+	"aws_nat_gateway":            attr("id"),
+	"aws_network_interface":      attr("id"),
+	"aws_lb":                     attr("arn"),
+	"aws_alb":                    attr("arn"),
+	"aws_elb":                    attr("name"),
+	"aws_ebs_snapshot":           attr("id"),
+	"aws_ebs_snapshot_copy":      attr("id"),
+	"aws_ami":                    attr("id"),
+	"aws_ami_copy":               attr("id"),
+	"aws_ami_from_instance":      attr("id"),
 }
 
-// liveType maps state types that adopt AWS-made resources to the live type
-// they manage.
+// liveType maps state types that adopt AWS-made resources, or are aliases or
+// other ways of creating one, to the live type they manage.
 var liveType = map[string]string{
+	"aws_alb":                    "aws_lb",
+	"aws_ebs_snapshot_copy":      "aws_ebs_snapshot",
+	"aws_ami_copy":               "aws_ami",
+	"aws_ami_from_instance":      "aws_ami",
 	"aws_default_vpc":            "aws_vpc",
 	"aws_default_subnet":         "aws_subnet",
 	"aws_default_route_table":    "aws_route_table",

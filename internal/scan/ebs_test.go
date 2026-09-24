@@ -2,6 +2,7 @@ package scan
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -56,5 +57,47 @@ func TestEBSList(t *testing.T) {
 	}
 	if used.Key != "vol-used" || used.Idle != "" || used.Created != nil {
 		t.Errorf("in-use volume: %+v", used)
+	}
+}
+
+// fakeSnapshots serves one page of snapshots over a volume fake.
+type fakeSnapshots struct {
+	fakeEC2
+	snaps []types.Snapshot
+}
+
+func (f fakeSnapshots) DescribeSnapshots(_ context.Context, in *ec2.DescribeSnapshotsInput, _ ...func(*ec2.Options)) (*ec2.DescribeSnapshotsOutput, error) {
+	if len(in.OwnerIds) != 1 || in.OwnerIds[0] != "self" {
+		return nil, fmt.Errorf("owners %v: want only the account's own", in.OwnerIds)
+	}
+	return &ec2.DescribeSnapshotsOutput{Snapshots: f.snaps}, nil
+}
+
+func TestSnapshotsList(t *testing.T) {
+	client := fakeSnapshots{
+		fakeEC2: fakeEC2{"": {Volumes: []types.Volume{{VolumeId: aws.String("vol-live")}}}},
+		snaps: []types.Snapshot{
+			{SnapshotId: aws.String("snap-gone"), VolumeId: aws.String("vol-gone"), VolumeSize: aws.Int32(100), Tags: nameTag("old")},
+			{SnapshotId: aws.String("snap-live"), VolumeId: aws.String("vol-live"), VolumeSize: aws.Int32(8)},
+			{SnapshotId: aws.String("snap-copy"), VolumeId: aws.String("vol-ffffffff"), VolumeSize: aws.Int32(8)},
+		},
+	}
+	got, err := Snapshots{client}.List(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 3 {
+		t.Fatalf("got %+v", got)
+	}
+	idle, live, cp := got[0], got[1], got[2]
+	if idle.Type != "aws_ebs_snapshot" || idle.Key != "snap-gone" || idle.Name != "old" ||
+		idle.SizeGB != 100 || idle.Idle != "source volume deleted" {
+		t.Errorf("source deleted: %+v", idle)
+	}
+	if live.Key != "snap-live" || live.Idle != "" {
+		t.Errorf("live source: %+v", live)
+	}
+	if cp.Idle != "" {
+		t.Errorf("copy, source unknown, is never idle: %+v", cp)
 	}
 }
