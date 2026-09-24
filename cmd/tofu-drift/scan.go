@@ -14,8 +14,11 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/autoscaling"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
+	"github.com/aws/aws-sdk-go-v2/service/ecs"
+	"github.com/aws/aws-sdk-go-v2/service/eks"
 	"github.com/aws/aws-sdk-go-v2/service/elasticache"
 	elb "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancing"
 	elbv2 "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2"
@@ -61,6 +64,10 @@ var newScanners = func(cfg aws.Config) []scan.Scanner {
 		scan.DynamoDBTables{Client: dynamodb.NewFromConfig(cfg)},
 		scan.ElastiCache{Client: elasticache.NewFromConfig(cfg)},
 		scan.S3Buckets{Client: s3.NewFromConfig(cfg)},
+		scan.AutoScalingGroups{Client: autoscaling.NewFromConfig(cfg)},
+		scan.EKSClusters{Client: eks.NewFromConfig(cfg)},
+		scan.ECSClusters{Client: ecs.NewFromConfig(cfg)},
+		scan.ECSServices{Client: ecs.NewFromConfig(cfg)},
 	}
 }
 
@@ -133,7 +140,7 @@ func (p *pipeline) flags(cmd *cobra.Command) {
 	cmd.Flags().StringVar(&p.statePath, "state", "", "state file: local path or s3://bucket/key (default: tofu state pull in the current root module)")
 	cmd.Flags().StringVar(&p.region, "region", "", "AWS region to scan (default: from environment or profile)")
 	cmd.Flags().StringVar(&p.profile, "profile", "", "AWS shared config profile")
-	cmd.Flags().BoolVar(&p.includeDefaults, "include-defaults", false, "report Default Furniture: the default VPC and its subnets, main route tables, default security groups")
+	cmd.Flags().BoolVar(&p.includeDefaults, "include-defaults", false, "report Default Furniture: the default VPC and its subnets, main route tables, default security groups, the default ECS cluster")
 	cmd.Flags().StringVar(&p.configPath, "config", "tofu-drift.toml", "config file with Ignore Rules (optional unless given)")
 }
 

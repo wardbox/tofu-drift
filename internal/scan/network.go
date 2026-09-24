@@ -97,6 +97,10 @@ func (s ENIs) List(ctx context.Context) ([]LiveResource, error) {
 			}
 			tags := ec2Tags(n.TagSet)
 			r := LiveResource{Type: "aws_network_interface", Key: aws.ToString(n.NetworkInterfaceId), Name: tags["Name"], Tags: tags}
+			// The description names the creator, e.g. "Amazon EKS <cluster>".
+			if r.Name == "" {
+				r.Name = aws.ToString(n.Description)
+			}
 			if n.Status == types.NetworkInterfaceStatusAvailable {
 				r.Idle = "unattached"
 			}

@@ -18,6 +18,10 @@ If one service's calls are denied or take longer than 30 seconds, that service i
 | NAT gateway | `aws_nat_gateway` | never | hourly × 730, plus its Elastic IPs |
 | ALB / NLB | `aws_lb` | it has target groups and all are empty | hourly × 730 |
 | Classic load balancer | `aws_elb` | no instances | hourly × 730 |
+| Auto Scaling group | `aws_autoscaling_group` | never | its instances |
+| EKS cluster | `aws_eks_cluster` | never | $0.10/h control plane × 730, plus its nodes |
+| ECS cluster | `aws_ecs_cluster` | never | $0 (the `default` cluster is suppressed unless `--include-defaults`) |
+| ECS service | `aws_ecs_service` | never | $0 |
 | Network interface | `aws_network_interface` | unattached | $0 |
 | VPC | `aws_vpc` | never | $0 |
 | Subnet | `aws_subnet` | never | $0 |
@@ -29,7 +33,7 @@ If one service's calls are denied or take longer than 30 seconds, that service i
 | ElastiCache cluster | `aws_elasticache_cluster`, `aws_elasticache_replication_group` | never | node hourly × 730 × nodes |
 | S3 bucket | `aws_s3_bucket` | never | $0, size unknown |
 
-Resources another resource creates are folded into their parent's row: an instance's launch-time volumes and network interface, a NAT gateway's Elastic IPs and network interface, an AMI's snapshots, an RDS instance's automated snapshots. ElastiCache clusters in a replication group are one row for the group. Network interfaces AWS services manage for themselves (load balancers, Lambda, RDS, VPC endpoints) are skipped. Load-balancer processing (LCU) and NAT data charges are not estimated, nor is RDS storage, backup or snapshot storage. RDS is priced at MySQL rates and ElastiCache at Redis rates whatever the engine. S3 buckets are listed account-wide with no per-bucket calls, so their region shows as `global`; DynamoDB tables are not sized.
+Resources another resource creates are folded into their parent's row: an instance's launch-time volumes and network interface, a NAT gateway's Elastic IPs and network interface, an AMI's snapshots, an RDS instance's automated snapshots, an Auto Scaling group's instances, and an EKS cluster's security group, control-plane and VPC CNI network interfaces, nodegroup Auto Scaling groups and nodes (found by the `eks:cluster-name` tag). When the parent is managed, these never appear. ElastiCache clusters in a replication group are one row for the group. Network interfaces AWS services manage for themselves (load balancers, Lambda, RDS, VPC endpoints) are skipped. Load-balancer processing (LCU) and NAT data charges are not estimated, nor is RDS storage, backup or snapshot storage. RDS is priced at MySQL rates and ElastiCache at Redis rates whatever the engine. S3 buckets are listed account-wide with no per-bucket calls, so their region shows as `global`; DynamoDB tables are not sized.
 
 ## Ignore Rules
 

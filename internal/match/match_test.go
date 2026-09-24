@@ -1,21 +1,103 @@
 package match
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/wardbox/tofu-drift/internal/scan"
 	"github.com/wardbox/tofu-drift/internal/state"
 )
 
+// rootKeys is Roots as "type/key" of child to "type/key" of root.
+func rootKeys(live []scan.LiveResource) map[string]string {
+	m := map[string]string{}
+	for c, p := range Roots(live) {
+		m[live[c].Type+"/"+live[c].Key] = live[p].Type + "/" + live[p].Key
+	}
+	return m
+}
+
 func TestRoots(t *testing.T) {
-	roots := Roots([]scan.LiveResource{
+	roots := rootKeys([]scan.LiveResource{
 		{Key: "asg-1", Derived: []string{"i-1"}},
 		{Key: "i-1", Derived: []string{"vol-1"}},
 		{Key: "vol-1"},
 		{Key: "vol-2"},
 	})
-	if roots["vol-1"] != "asg-1" || roots["i-1"] != "asg-1" || len(roots) != 2 {
+	if roots["/vol-1"] != "/asg-1" || roots["/i-1"] != "/asg-1" || len(roots) != 2 {
 		t.Errorf("roots: %v", roots)
+	}
+}
+
+// An ASG sharing its EKS cluster's name folds into the cluster, not itself,
+// and a same-named ECS cluster stays apart.
+func TestRootsNameClash(t *testing.T) {
+	roots := rootKeys([]scan.LiveResource{
+		{Type: "aws_eks_cluster", Key: "prod"},
+		{Type: "aws_autoscaling_group", Key: "prod", Tags: map[string]string{"eks:cluster-name": "prod"}, Derived: []string{"i-1"}},
+		{Type: "aws_instance", Key: "i-1"},
+		{Type: "aws_ecs_cluster", Key: "prod"},
+	})
+	want := map[string]string{"aws_autoscaling_group/prod": "aws_eks_cluster/prod", "aws_instance/i-1": "aws_eks_cluster/prod"}
+	if fmt.Sprint(roots) != fmt.Sprint(want) {
+		t.Errorf("roots: %v, want %v", roots, want)
+	}
+}
+
+func TestRootsCycle(t *testing.T) {
+	roots := Roots([]scan.LiveResource{
+		{Key: "a", Derived: []string{"b"}},
+		{Key: "b", Derived: []string{"a"}},
+	})
+	if len(roots) != 2 {
+		t.Errorf("a Derived cycle must terminate: %v", roots)
+	}
+}
+
+func TestRootsByTag(t *testing.T) {
+	eks := map[string]string{"eks:cluster-name": "prod"}
+	live := []scan.LiveResource{
+		{Type: "aws_eks_cluster", Key: "prod", Derived: []string{"sg-eks"}},
+		{Type: "aws_security_group", Key: "sg-eks"},
+		// Nodegroup ASG by tag, its instances by attribute.
+		{Type: "aws_autoscaling_group", Key: "eks-ng", Tags: eks, Derived: []string{"i-ng"}},
+		{Type: "aws_instance", Key: "i-ng", Tags: eks},
+		// A node outside any ASG, and ENIs of the control plane and the VPC CNI.
+		{Type: "aws_instance", Key: "i-node", Tags: eks},
+		{Type: "aws_network_interface", Key: "eni-cp", Name: "Amazon EKS prod"},
+		{Type: "aws_network_interface", Key: "eni-cni", Tags: map[string]string{"cluster.k8s.amazonaws.com/name": "prod"}},
+		// Tag names a cluster not in live (deleted, or its scanner failed): stands alone.
+		{Type: "aws_instance", Key: "i-gone", Tags: map[string]string{"eks:cluster-name": "gone"}},
+		{Type: "aws_network_interface", Key: "eni-other", Name: "Amazon EKS gone"},
+	}
+	got := map[string]string{}
+	for c, p := range Roots(live) {
+		got[live[c].Key] = live[p].Key
+	}
+	want := map[string]string{"sg-eks": "prod", "eks-ng": "prod", "i-ng": "prod", "i-node": "prod", "eni-cp": "prod", "eni-cni": "prod"}
+	if fmt.Sprint(got) != fmt.Sprint(want) {
+		t.Errorf("roots: %v, want %v", got, want)
+	}
+}
+
+func TestIndexCompute(t *testing.T) {
+	idx := Index([]state.Resource{
+		{Address: "aws_autoscaling_group.web", Type: "aws_autoscaling_group", Attributes: map[string]any{"id": "web"}},
+		{Address: "aws_eks_cluster.prod", Type: "aws_eks_cluster", Attributes: map[string]any{"id": "prod"}},
+		{Address: "aws_ecs_cluster.app", Type: "aws_ecs_cluster", Attributes: map[string]any{"id": "arn:c/app", "name": "app"}},
+		{Address: "aws_ecs_service.api", Type: "aws_ecs_service", Attributes: map[string]any{"id": "arn:s/api", "name": "api", "cluster": "arn:aws:ecs:us-east-1:1:cluster/app"}},
+		{Address: "aws_ecs_service.byname", Type: "aws_ecs_service", Attributes: map[string]any{"name": "web", "cluster": "app"}},
+	})
+	for typ, want := range map[[2]string]string{
+		{"aws_autoscaling_group", "web"}: "aws_autoscaling_group.web",
+		{"aws_eks_cluster", "prod"}:      "aws_eks_cluster.prod",
+		{"aws_ecs_cluster", "app"}:       "aws_ecs_cluster.app",
+		{"aws_ecs_service", "app/api"}:   "aws_ecs_service.api",
+		{"aws_ecs_service", "app/web"}:   "aws_ecs_service.byname",
+	} {
+		if got := idx.Lookup(typ[0], typ[1]); got != want {
+			t.Errorf("%v: got %q, want %q", typ, got, want)
+		}
 	}
 }
 
@@ -128,6 +210,8 @@ func TestFurniture(t *testing.T) {
 		{scan.LiveResource{Type: "aws_route_table", Default: true}, true},
 		{scan.LiveResource{Type: "aws_security_group", Default: true}, true},
 		{scan.LiveResource{Type: "aws_security_group"}, false},
+		{scan.LiveResource{Type: "aws_ecs_cluster", Name: "default", Default: true}, true},
+		{scan.LiveResource{Type: "aws_ecs_cluster", Name: "app"}, false},
 		// Default only means furniture for types in the table.
 		{scan.LiveResource{Type: "aws_ebs_volume", Default: true}, false},
 	} {

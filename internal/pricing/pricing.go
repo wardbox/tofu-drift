@@ -116,6 +116,9 @@ func estimate(region string, r scan.LiveResource) (usd float64, approx bool, bas
 		return perHour("", rate(flat, region, "clb_hour"), false)
 	case "aws_s3_bucket", "aws_dynamodb_table":
 		return 0, false, "size unknown"
+	case "aws_eks_cluster":
+		// Standard-support control plane, the same in every region.
+		return perHour("control plane ", 0.10, false)
 	case "aws_instance", "aws_db_instance", "aws_elasticache_cluster", "aws_elasticache_replication_group":
 		if r.Stopped {
 			return 0, false, r.Class + " stopped, no compute charge"
