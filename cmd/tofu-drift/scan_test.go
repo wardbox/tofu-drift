@@ -135,3 +135,22 @@ func TestScanErrors(t *testing.T) {
 		t.Errorf("v3 state should be an error, got %v", err)
 	}
 }
+
+func TestScanDefaultFurniture(t *testing.T) {
+	stubScanners(t,
+		scan.LiveResource{Type: "aws_security_group", Key: "sg-default", Default: true},
+		scan.LiveResource{Type: "aws_security_group", Key: "sg-stray", Name: "old-web"},
+	)
+	out, err := runScan(t, "--state", "../../internal/state/testdata/v4.tfstate")
+	if !errors.Is(err, errFindings) {
+		t.Fatalf("want errFindings, got %v", err)
+	}
+	if strings.Contains(out, "sg-default") || !strings.Contains(out, "sg-stray") {
+		t.Errorf("default SG must be hidden, stray SG shown:\n%s", out)
+	}
+
+	out, err = runScan(t, "--state", "../../internal/state/testdata/v4.tfstate", "--include-defaults")
+	if !errors.Is(err, errFindings) || !strings.Contains(out, "sg-default") {
+		t.Errorf("--include-defaults must show the default SG:\n%s", out)
+	}
+}

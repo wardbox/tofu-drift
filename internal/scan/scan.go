@@ -26,6 +26,9 @@ type LiveResource struct {
 	Created *time.Time
 	// Idle is the idle reason, empty when the resource is in use.
 	Idle string
+	// Default is AWS's own marker that it created the resource: default VPC,
+	// default-for-AZ subnet, main route table, default security group.
+	Default bool
 
 	// Cost inputs.
 	Class  string // volume type, instance class, ...
