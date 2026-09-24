@@ -127,14 +127,16 @@ func listAll(ctx context.Context, w io.Writer, scanners []scan.Scanner) ([]scan.
 
 // getState reads s3://bucket/key. A state bucket often lives outside the scan
 // region; S3 then answers with the bucket's region in X-Amz-Bucket-Region and
-// the read is retried once there.
+// the read is retried once there. State objects often carry no checksum; the
+// SDK's warning about that is silenced.
 func getState(ctx context.Context, c *s3.Client, bucket, key string) (io.ReadCloser, error) {
 	in := &s3.GetObjectInput{Bucket: &bucket, Key: &key}
-	out, err := c.GetObject(ctx, in)
+	quiet := func(o *s3.Options) { o.DisableLogOutputChecksumValidationSkipped = true }
+	out, err := c.GetObject(ctx, in, quiet)
 	var re *awshttp.ResponseError
 	if errors.As(err, &re) && re.Response != nil {
 		if region := re.Response.Header.Get("X-Amz-Bucket-Region"); region != "" {
-			out, err = c.GetObject(ctx, in, func(o *s3.Options) { o.Region = region })
+			out, err = c.GetObject(ctx, in, quiet, func(o *s3.Options) { o.Region = region })
 		}
 	}
 	if err != nil {
@@ -271,7 +273,11 @@ func scanCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return render(cmd, r, explain, asJSON, r.WriteTable)
+			table := r.WriteTable
+			if p.statePath != "" { // drift detection was skipped
+				table = r.WriteUnmanagedTable
+			}
+			return render(cmd, r, explain, asJSON, table)
 		},
 	}
 	p.flags(cmd)

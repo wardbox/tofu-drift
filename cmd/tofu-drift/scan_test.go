@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -16,6 +17,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/aws/smithy-go/logging"
 	"github.com/spf13/cobra"
 	"github.com/wardbox/tofu-drift/internal/scan"
 )
@@ -84,6 +86,9 @@ func TestScanTable(t *testing.T) {
 	}
 	if strings.Contains(out, "vol-0aaa") {
 		t.Errorf("managed in-use volume reported:\n%s", out)
+	}
+	if strings.Contains(out, "Drift") {
+		t.Errorf("--state skips drift detection, so no Drift section:\n%s", out)
 	}
 	for _, want := range []string{"vol-stray", "scratch", "unmanaged+idle", "8.00",
 		"i-stray", "60.74", "1.3", "Unmanaged: $69/mo · Idle: $8/mo"} {
@@ -350,10 +355,16 @@ func TestGetStateOtherRegion(t *testing.T) {
 		_, _ = io.WriteString(w, "state")
 	}))
 	defer srv.Close()
+	var logs strings.Builder
 	c := s3.New(s3.Options{
-		Region:       "us-west-1",
-		BaseEndpoint: aws.String(srv.URL),
-		UsePathStyle: true,
+		Logger: logging.LoggerFunc(func(c logging.Classification, f string, v ...any) {
+			fmt.Fprintf(&logs, "%s "+f+"\n", append([]any{c}, v...)...)
+		}),
+		Region: "us-west-1",
+		// NewFromConfig's default, which logs a warning when a response has no checksum.
+		ResponseChecksumValidation: aws.ResponseChecksumValidationWhenSupported,
+		BaseEndpoint:               aws.String(srv.URL),
+		UsePathStyle:               true,
 		Credentials: aws.CredentialsProviderFunc(func(context.Context) (aws.Credentials, error) {
 			return aws.Credentials{AccessKeyID: "id", SecretAccessKey: "secret"}, nil
 		}),
@@ -365,5 +376,8 @@ func TestGetStateOtherRegion(t *testing.T) {
 	defer func() { _ = body.Close() }()
 	if b, _ := io.ReadAll(body); string(b) != "state" {
 		t.Errorf("got %q", b)
+	}
+	if logs.Len() > 0 {
+		t.Errorf("SDK logged on state read:\n%s", logs.String())
 	}
 }
