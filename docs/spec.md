@@ -53,7 +53,7 @@ Every run ends with the footer line. First run with no credentials prints the re
 
 **Match Key:** one `keyFor(type, attrs)` table producing the per-type canonical identifier (instance ID, bucket name, role name, Route53 zone ID stripped of `/hostedzone/`, ELB ARN). Match on key equality only; no ARN fallback. Unknown types in state are ignored.
 
-**Derived Resources:** folded into their parent, never a row. If the parent is Unmanaged, the parent is reported once with derived cost rolled up. Suppression table: EC2 instance→EBS volumes created with it (delete-on-termination; volumes attached later stand alone); ASG→instances; EKS→ENIs/SGs/nodegroup instances; ALB/NLB→ENIs; NAT→ENI/EIP; RDS→automated snapshots; Lambda→`/aws/lambda/*` log groups.
+**Derived Resources:** folded into their parent, never a row. If the parent is Unmanaged, the parent is reported once with derived cost rolled up. Suppression table: EC2 instance→EBS volumes and ENIs created with it (delete-on-termination; ones attached later stand alone); AMI→its EBS snapshots; ASG→instances; EKS→ENIs/SGs/nodegroup instances; ALB/NLB→ENIs; NAT→ENI/EIP; RDS→automated snapshots; Lambda→`/aws/lambda/*` log groups.
 
 **Default Furniture** (suppressed unless `--include-defaults`): default VPC and its subnets/IGW/route table/NACL/DHCP options; the default SG and main route table in every VPC; service-linked IAM roles (`/aws-service-role/`, `AWSServiceRoleFor*`); the `default` ECS cluster.
 

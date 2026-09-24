@@ -95,6 +95,39 @@ func TestAddLiveFoldsDerived(t *testing.T) {
 	}
 }
 
+func TestAddLiveFlatRate(t *testing.T) {
+	r := New(Scan{Region: "us-east-1"}, []state.Resource{
+		{Address: "aws_ami.golden", Type: "aws_ami", Attributes: map[string]any{"id": "ami-1"}},
+	})
+	r.AddLive([]scan.LiveResource{
+		{Type: "aws_eip", Key: "eipalloc-free", Idle: "unassociated"},
+		// NAT folds its EIP: one row, both charges.
+		{Type: "aws_nat_gateway", Key: "nat-1", Derived: []string{"eipalloc-nat"}},
+		{Type: "aws_eip", Key: "eipalloc-nat"},
+		// Managed idle AMI carries its snapshot's cost and carbon.
+		{Type: "aws_ami", Key: "ami-1", Idle: "no instances", Derived: []string{"snap-1"}},
+		{Type: "aws_ebs_snapshot", Key: "snap-1", SizeGB: 100, Idle: "source volume deleted"},
+	}, time.Now())
+
+	var ids []string
+	for _, f := range r.Findings {
+		ids = append(ids, f.ID)
+	}
+	if want := "[nat-1 ami-1 eipalloc-free]"; fmt.Sprint(ids) != want {
+		t.Fatalf("findings %v, want %s", ids, want)
+	}
+	nat, ami, eip := r.Findings[0], r.Findings[1], r.Findings[2]
+	if math.Abs(nat.USDMo-(0.045+0.005)*730) > 1e-9 || nat.Idle != nil {
+		t.Errorf("nat: %+v", nat)
+	}
+	if ami.Unmanaged || ami.USDMo != 5 || ami.KgCO2Mo == 0 {
+		t.Errorf("ami: %+v", ami)
+	}
+	if eip.USDMo != 3.65 || eip.status() != "unmanaged+idle" {
+		t.Errorf("eip: %+v", eip)
+	}
+}
+
 func TestApproxMarked(t *testing.T) {
 	r := New(Scan{Region: "af-south-1"}, nil)
 	r.AddLive([]scan.LiveResource{{Type: "aws_instance", Key: "i-far", Class: "t3.large"}}, time.Now())

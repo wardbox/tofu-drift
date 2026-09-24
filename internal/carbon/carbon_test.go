@@ -20,6 +20,19 @@ func TestMonthlyEBS(t *testing.T) {
 	}
 }
 
+func TestMonthlyFlat(t *testing.T) {
+	// 1 TB snapshot: HDD coefficient, like CCF classifies snapshot storage.
+	want := 730 * 0.65 * 2 * 1.135 / 1000 * 0.379069
+	if got := Monthly("us-east-1", scan.LiveResource{Type: "aws_ebs_snapshot", SizeGB: 1000}); math.Abs(got-want) > 1e-9 {
+		t.Errorf("snapshot: got %v, want %v", got, want)
+	}
+	for _, typ := range []string{"aws_eip", "aws_network_interface", "aws_nat_gateway", "aws_lb", "aws_elb", "aws_ami"} {
+		if got := Monthly("us-east-1", scan.LiveResource{Type: typ, SizeGB: 1000}); got != 0 {
+			t.Errorf("%s: got %v, want 0 (network ignored; AMIs carry carbon via their snapshots)", typ, got)
+		}
+	}
+}
+
 func TestMonthlyEC2(t *testing.T) {
 	// t3.large in us-east-1: 2 vCPU × (0.74+3.5)/2 W × 730 h × 1.135 PUE / 1000 × 0.379069 kg/kWh
 	want := 2 * (0.74 + 3.5) / 2 * 730 * 1.135 / 1000 * 0.379069

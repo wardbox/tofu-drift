@@ -56,8 +56,15 @@ func Monthly(region string, r scan.LiveResource) float64 {
 		case "st1", "sc1", "standard":
 			disk = "hdd"
 		}
-		kwh := r.SizeGB / 1000 * pricing.HoursPerMonth * coef.StorageWh[disk] * coef.EBSReplication * coef.PUE / 1000
-		return kwh * grid(region)
+		return storage(region, disk, r.SizeGB)
+	case "aws_ebs_snapshot":
+		return storage(region, "hdd", r.SizeGB)
 	}
 	return 0
+}
+
+// storage is the kgCO₂/mo of gb of replicated EBS-class storage on disk.
+func storage(region, disk string, gb float64) float64 {
+	kwh := gb / 1000 * pricing.HoursPerMonth * coef.StorageWh[disk] * coef.EBSReplication * coef.PUE / 1000
+	return kwh * grid(region)
 }

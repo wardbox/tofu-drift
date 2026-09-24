@@ -14,6 +14,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
+	elb "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancing"
+	elbv2 "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
 	"github.com/spf13/cobra"
@@ -34,6 +36,13 @@ var newScanners = func(cfg aws.Config) []scan.Scanner {
 		scan.Subnets{Client: client},
 		scan.RouteTables{Client: client},
 		scan.SecurityGroups{Client: client},
+		scan.EIPs{Client: client},
+		scan.NATGateways{Client: client},
+		scan.ENIs{Client: client},
+		scan.Snapshots{Client: client},
+		scan.AMIs{Client: client},
+		scan.LoadBalancers{Client: elbv2.NewFromConfig(cfg)},
+		scan.ClassicLoadBalancers{Client: elb.NewFromConfig(cfg)},
 	}
 }
 

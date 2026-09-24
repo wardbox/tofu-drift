@@ -59,6 +59,39 @@ func TestIndexPlumbing(t *testing.T) {
 	}
 }
 
+func TestIndexFlatRate(t *testing.T) {
+	idx := Index([]state.Resource{
+		{Address: "aws_eip.nat", Type: "aws_eip", Attributes: map[string]any{"id": "eipalloc-1"}},
+		{Address: "aws_nat_gateway.a", Type: "aws_nat_gateway", Attributes: map[string]any{"id": "nat-1"}},
+		{Address: "aws_network_interface.x", Type: "aws_network_interface", Attributes: map[string]any{"id": "eni-1"}},
+		{Address: "aws_lb.web", Type: "aws_lb", Attributes: map[string]any{"id": "arn:lb/web", "arn": "arn:lb/web"}},
+		{Address: "aws_alb.old", Type: "aws_alb", Attributes: map[string]any{"arn": "arn:lb/old"}},
+		{Address: "aws_elb.legacy", Type: "aws_elb", Attributes: map[string]any{"id": "legacy", "name": "legacy"}},
+		{Address: "aws_ebs_snapshot.s", Type: "aws_ebs_snapshot", Attributes: map[string]any{"id": "snap-1"}},
+		{Address: "aws_ebs_snapshot_copy.c", Type: "aws_ebs_snapshot_copy", Attributes: map[string]any{"id": "snap-2"}},
+		{Address: "aws_ami.a", Type: "aws_ami", Attributes: map[string]any{"id": "ami-1"}},
+		{Address: "aws_ami_copy.c", Type: "aws_ami_copy", Attributes: map[string]any{"id": "ami-2"}},
+		{Address: "aws_ami_from_instance.i", Type: "aws_ami_from_instance", Attributes: map[string]any{"id": "ami-3"}},
+	})
+	for typ, want := range map[[2]string]string{
+		{"aws_eip", "eipalloc-1"}:          "aws_eip.nat",
+		{"aws_nat_gateway", "nat-1"}:       "aws_nat_gateway.a",
+		{"aws_network_interface", "eni-1"}: "aws_network_interface.x",
+		{"aws_lb", "arn:lb/web"}:           "aws_lb.web",
+		{"aws_lb", "arn:lb/old"}:           "aws_alb.old",
+		{"aws_elb", "legacy"}:              "aws_elb.legacy",
+		{"aws_ebs_snapshot", "snap-1"}:     "aws_ebs_snapshot.s",
+		{"aws_ebs_snapshot", "snap-2"}:     "aws_ebs_snapshot_copy.c",
+		{"aws_ami", "ami-1"}:               "aws_ami.a",
+		{"aws_ami", "ami-2"}:               "aws_ami_copy.c",
+		{"aws_ami", "ami-3"}:               "aws_ami_from_instance.i",
+	} {
+		if got := idx.Lookup(typ[0], typ[1]); got != want {
+			t.Errorf("%v: got %q, want %q", typ, got, want)
+		}
+	}
+}
+
 func TestFurniture(t *testing.T) {
 	for _, tc := range []struct {
 		r    scan.LiveResource

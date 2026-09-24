@@ -10,6 +10,7 @@ No AWS credentials needed: it streams the public [AWS Price List Bulk API](https
 
 - `internal/pricing/instances.json`: vCPU count per instance class, and on-demand USD/hour per region per class, for EC2 (Linux, shared tenancy), RDS (MySQL, Single-AZ) and ElastiCache (Redis). Regions are the ten in `docs/spec.md` §5; tofu-drift prices any other region at the us-east-1 rate and marks it `≈`.
 - `internal/pricing/ebs.json`: USD per GB-month per volume type, refreshed for the same ten regions. Other regions, and `io2` (not in the offer files), are kept as hand-seeded.
+- `internal/pricing/flat.json`: flat rates per region: Elastic IP, NAT gateway, ALB, NLB and CLB USD/hour, and EBS snapshot USD per GB-month, from the EC2, AWSELB and AmazonVPC offer files. Refreshed for the same ten regions; the other six were seeded from the same offer files and are kept.
 
 Only on-demand prices are collected. Reserved instances and savings plans are ignored.
 

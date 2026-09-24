@@ -53,3 +53,35 @@ func TestMonthlyEC2(t *testing.T) {
 		t.Errorf("vcpu: %d %d %d", VCPU("t3.large"), VCPU("db.t3.large"), VCPU("cache.t3.medium"))
 	}
 }
+
+func TestMonthlyFlat(t *testing.T) {
+	for _, tc := range []struct {
+		region string
+		r      scan.LiveResource
+		want   float64
+	}{
+		{"us-east-1", scan.LiveResource{Type: "aws_eip"}, 3.65},
+		{"us-east-1", scan.LiveResource{Type: "aws_nat_gateway"}, 0.045 * 730},
+		{"sa-east-1", scan.LiveResource{Type: "aws_nat_gateway"}, 0.093 * 730},
+		{"us-east-1", scan.LiveResource{Type: "aws_lb", Class: "application"}, 0.0225 * 730},
+		{"eu-west-2", scan.LiveResource{Type: "aws_lb", Class: "network"}, 0.02646 * 730},
+		{"us-east-1", scan.LiveResource{Type: "aws_elb"}, 0.025 * 730},
+		{"us-east-1", scan.LiveResource{Type: "aws_ebs_snapshot", SizeGB: 100}, 5},
+		{"xx-nowhere-1", scan.LiveResource{Type: "aws_ebs_snapshot", SizeGB: 100}, 5},
+		// ENIs are free; an AMI's cost is its Derived snapshots.
+		{"us-east-1", scan.LiveResource{Type: "aws_network_interface"}, 0},
+		{"us-east-1", scan.LiveResource{Type: "aws_ami"}, 0},
+	} {
+		if got, approx := Monthly(tc.region, tc.r); math.Abs(got-tc.want) > 1e-9 || approx {
+			t.Errorf("%s %s %s: got %v, want %v", tc.region, tc.r.Type, tc.r.Class, got, tc.want)
+		}
+	}
+	// Every region seeded carries every flat rate.
+	for region, rates := range flat {
+		for _, k := range []string{"eip_hour", "nat_gateway_hour", "alb_hour", "nlb_hour", "clb_hour", "snapshot_gb_month"} {
+			if rates[k] <= 0 {
+				t.Errorf("%s: no %s", region, k)
+			}
+		}
+	}
+}
