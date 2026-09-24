@@ -29,6 +29,7 @@ var newScanners = func(cfg aws.Config) []scan.Scanner {
 	client := ec2.NewFromConfig(cfg)
 	return []scan.Scanner{
 		scan.EBS{Client: client},
+		scan.EC2{Client: client},
 		scan.VPCs{Client: client},
 		scan.Subnets{Client: client},
 		scan.RouteTables{Client: client},

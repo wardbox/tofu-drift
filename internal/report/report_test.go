@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"math"
+	"strings"
 	"testing"
 	"time"
 
@@ -65,5 +66,46 @@ Unmanaged: $12/mo · Idle: $9/mo · ~0.1 kgCO₂/mo (≈ 0.00 trans-Atlantic fli
 `
 	if out.String() != want {
 		t.Errorf("table:\n%s\nwant:\n%s", out.String(), want)
+	}
+}
+
+func TestAddLiveFoldsDerived(t *testing.T) {
+	r := New(Scan{Region: "us-east-1"}, []state.Resource{
+		{Address: "aws_instance.app", Type: "aws_instance", Attributes: map[string]any{"id": "i-app"}},
+	})
+	r.AddLive([]scan.LiveResource{
+		{Type: "aws_ebs_volume", Key: "vol-off", Class: "gp3", SizeGB: 100},
+		{Type: "aws_instance", Key: "i-off", Class: "t3.large", Stopped: true, Derived: []string{"vol-off"}},
+		{Type: "aws_instance", Key: "i-run", Class: "t3.large", Derived: []string{"vol-run"}},
+		{Type: "aws_ebs_volume", Key: "vol-run", Class: "gp3", SizeGB: 10},
+		// root volume of a managed instance: folded away, not Unmanaged
+		{Type: "aws_instance", Key: "i-app", Class: "t3.large", Derived: []string{"vol-app"}},
+		{Type: "aws_ebs_volume", Key: "vol-app", Class: "gp3", SizeGB: 8},
+	}, time.Now())
+
+	if len(r.Findings) != 2 {
+		t.Fatalf("findings: %+v", r.Findings)
+	}
+	run, off := r.Findings[0], r.Findings[1]
+	if run.ID != "i-run" || math.Abs(run.USDMo-(0.0832*730+0.8)) > 1e-9 {
+		t.Errorf("running instance: compute plus its volume: %+v", run)
+	}
+	if off.ID != "i-off" || off.USDMo != 8 || off.KgCO2Mo == 0 {
+		t.Errorf("stopped instance: attached EBS only: %+v", off)
+	}
+}
+
+func TestApproxMarked(t *testing.T) {
+	r := New(Scan{Region: "af-south-1"}, nil)
+	r.AddLive([]scan.LiveResource{{Type: "aws_instance", Key: "i-far", Class: "t3.large"}}, time.Now())
+	if !r.Findings[0].Approx {
+		t.Fatalf("unlisted region must be marked approx: %+v", r.Findings[0])
+	}
+	var out bytes.Buffer
+	if err := r.WriteTable(&out); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out.String(), "≈60.74") {
+		t.Errorf("table missing ≈ price:\n%s", out.String())
 	}
 }

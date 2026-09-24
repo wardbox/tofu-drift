@@ -26,6 +26,8 @@ type LiveResource struct {
 	Created *time.Time
 	// Idle is the idle reason, empty when the resource is in use.
 	Idle string
+	// Derived are the Match Keys of Derived Resources folded into this one.
+	Derived []string
 	// Default is AWS's own marker that it created the resource: default VPC,
 	// default-for-AZ subnet, main route table, default security group.
 	Default bool
@@ -33,4 +35,6 @@ type LiveResource struct {
 	// Cost inputs.
 	Class  string // volume type, instance class, ...
 	SizeGB float64
+	// Stopped instances cost no compute.
+	Stopped bool
 }

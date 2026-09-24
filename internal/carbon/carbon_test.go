@@ -20,6 +20,19 @@ func TestMonthlyEBS(t *testing.T) {
 	}
 }
 
+func TestMonthlyEC2(t *testing.T) {
+	// t3.large in us-east-1: 2 vCPU × (0.74+3.5)/2 W × 730 h × 1.135 PUE / 1000 × 0.379069 kg/kWh
+	want := 2 * (0.74 + 3.5) / 2 * 730 * 1.135 / 1000 * 0.379069
+	large := scan.LiveResource{Type: "aws_instance", Class: "t3.large"}
+	if got := Monthly("us-east-1", large); math.Abs(got-want) > 1e-9 {
+		t.Errorf("running: got %v, want %v", got, want)
+	}
+	large.Stopped = true
+	if got := Monthly("us-east-1", large); got != 0 {
+		t.Errorf("stopped: got %v", got)
+	}
+}
+
 func TestFlights(t *testing.T) {
 	if got := Flights(15); math.Abs(got-0.02) > 1e-9 {
 		t.Errorf("got %v", got)

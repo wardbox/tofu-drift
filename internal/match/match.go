@@ -11,6 +11,7 @@ import (
 // attributes. Types absent here are ignored.
 var keyFor = map[string]func(attrs map[string]any) string{
 	"aws_ebs_volume":             attr("id"),
+	"aws_instance":               attr("id"),
 	"aws_vpc":                    attr("id"),
 	"aws_subnet":                 attr("id"),
 	"aws_route_table":            attr("id"),
@@ -54,6 +55,26 @@ func Index(rs []state.Resource) Managed {
 		}
 	}
 	return m
+}
+
+// Roots maps the key of every Derived Resource in live to the key of its
+// top-level parent, the one resource it is folded into.
+func Roots(live []scan.LiveResource) map[string]string {
+	parent := map[string]string{}
+	for _, l := range live {
+		for _, d := range l.Derived {
+			parent[d] = l.Key
+		}
+	}
+	roots := make(map[string]string, len(parent))
+	for d := range parent {
+		root := d
+		for p, ok := parent[root]; ok; p, ok = parent[root] {
+			root = p
+		}
+		roots[d] = root
+	}
+	return roots
 }
 
 // Lookup returns the state address for a live resource, or "" if Unmanaged.

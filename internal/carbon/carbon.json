@@ -1,6 +1,7 @@
 {
   "_source": "Cloud Carbon Footprint methodology, https://www.cloudcarbonfootprint.org/docs/methodology",
   "pue": 1.135,
+  "compute_watts_per_vcpu": {"min": 0.74, "max": 3.5},
   "storage_wh_per_tb_hour": {"ssd": 1.2, "hdd": 0.65},
   "ebs_replication": 2,
   "grid_kg_per_kwh": {

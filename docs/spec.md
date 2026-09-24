@@ -35,7 +35,7 @@ Every run ends with the footer line. First run with no credentials prints the re
   "findings": [{
     "id": "", "address": "", "type": "", "name": "",
     "drift": null, "unmanaged": true, "idle": "unattached",
-    "usd_mo": 0, "kgco2_mo": 0, "age_days": null
+    "usd_mo": 0, "usd_mo_approx": true, "kgco2_mo": 0, "age_days": null
   }],
   "totals": {"unmanaged_usd_mo": 0, "idle_usd_mo": 0, "kgco2_mo": 0}
 }
@@ -53,7 +53,7 @@ Every run ends with the footer line. First run with no credentials prints the re
 
 **Match Key:** one `keyFor(type, attrs)` table producing the per-type canonical identifier (instance ID, bucket name, role name, Route53 zone ID stripped of `/hostedzone/`, ELB ARN). Match on key equality only; no ARN fallback. Unknown types in state are ignored.
 
-**Derived Resources:** folded into their parent, never a row. If the parent is Unmanaged, the parent is reported once with derived cost rolled up. Suppression table: ASG→instances; EKS→ENIs/SGs/nodegroup instances; ALB/NLB→ENIs; NAT→ENI/EIP; RDS→automated snapshots; Lambda→`/aws/lambda/*` log groups.
+**Derived Resources:** folded into their parent, never a row. If the parent is Unmanaged, the parent is reported once with derived cost rolled up. Suppression table: EC2 instance→EBS volumes created with it (delete-on-termination; volumes attached later stand alone); ASG→instances; EKS→ENIs/SGs/nodegroup instances; ALB/NLB→ENIs; NAT→ENI/EIP; RDS→automated snapshots; Lambda→`/aws/lambda/*` log groups.
 
 **Default Furniture** (suppressed unless `--include-defaults`): default VPC and its subnets/IGW/route table/NACL/DHCP options; the default SG and main route table in every VPC; service-linked IAM roles (`/aws-service-role/`, `AWSServiceRoleFor*`); the `default` ECS cluster.
 
@@ -76,9 +76,9 @@ Chosen for waste-likelihood × small-team ubiquity. Published as a hand-written 
 
 ## 5. Cost & Carbon Estimation
 
-**Cost:** static pricing table shipped in the binary, refreshed at release time by `hack/pricing/` from the AWS Pricing API — never queried live. Flat rates (NAT hourly, EBS per GB, EIP, ALB hourly, snapshot per GB) for all regions. Instance-class tables (EC2, RDS, ElastiCache) for us-east-1, us-east-2, us-west-2, eu-west-1, eu-west-2, eu-central-1, ap-southeast-1, ap-southeast-2, ap-northeast-1, ca-central-1; other regions use the us-east-1 price marked `≈`.
+**Cost:** static pricing table shipped in the binary, refreshed at release time by `hack/pricing/` from the AWS Pricing API — never queried live. Flat rates (NAT hourly, EBS per GB, EIP, ALB hourly, snapshot per GB) for all regions. Instance-class tables (EC2, RDS, ElastiCache) for us-east-1, us-east-2, us-west-2, eu-west-1, eu-west-2, eu-central-1, ap-southeast-1, ap-southeast-2, ap-northeast-1, ca-central-1; other regions use the us-east-1 price marked `≈` (`usd_mo_approx`, omitted when false, in `--json`).
 
-Cost basis: running instance = on-demand hourly × 730; stopped instance = attached EBS only; EBS and snapshots = GB × rate (snapshots at full size); log groups = `storedBytes` from DescribeLogGroups; S3 = $0 with note "size unknown"; Lambda, IAM, SG, VPC, subnet, route table = $0. Reserved instances and savings plans ignored. Everything labeled "estimated"; ranking matters more than precision.
+Cost basis: running instance = on-demand hourly × 730 plus its Derived EBS volumes; stopped instance = those volumes only; EBS and snapshots = GB × rate (snapshots at full size); log groups = `storedBytes` from DescribeLogGroups; S3 = $0 with note "size unknown"; Lambda, IAM, SG, VPC, subnet, route table = $0. Reserved instances and savings plans ignored. Everything labeled "estimated"; ranking matters more than precision.
 
 **Carbon:** Cloud Carbon Footprint methodology. Compute = vCPU × average watts (midpoint of CCF min/max) × 730 h × PUE × regional grid intensity; storage = TB-hours × CCF coefficient; network ignored; plumbing = 0. vCPU counts come from the instance-type table already needed for pricing. Coefficients and grid intensities shipped as JSON in `internal/carbon/`, CCF cited in the README. One decimal, clearly labeled estimate. All figures monthly.
 
