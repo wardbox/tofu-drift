@@ -6,8 +6,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"cmp"
+	"maps"
+	"regexp"
 	"slices"
-	"sort"
+	"strconv"
 	"strings"
 	"text/tabwriter"
 	"time"
@@ -33,6 +36,9 @@ type Report struct {
 	Ignore func(scan.LiveResource) bool `json:"-"`
 
 	managed match.Managed
+	// live and drifts back --explain, by Match Key and address.
+	live   map[string]scan.LiveResource
+	drifts map[string]plan.Drift
 }
 
 type Scan struct {
@@ -68,8 +74,9 @@ type Totals struct {
 	KgCO2Mo        float64 `json:"kgco2_mo"`
 }
 
-func New(scan Scan, managed []state.Resource) *Report {
-	return &Report{Schema: Schema, Scan: scan, Findings: []Finding{}, managed: match.Index(managed)}
+func New(meta Scan, managed []state.Resource) *Report {
+	return &Report{Schema: Schema, Scan: meta,Findings: []Finding{}, managed: match.Index(managed),
+		live: map[string]scan.LiveResource{}, drifts: map[string]plan.Drift{}}
 }
 
 // AddLive turns live resources into Unmanaged and Idle Findings, costs them
@@ -79,6 +86,7 @@ func (r *Report) AddLive(live []scan.LiveResource, now time.Time) {
 	roots := match.Roots(live)
 	usd, kg, approx := map[string]float64{}, map[string]float64{}, map[string]bool{}
 	for _, l := range live {
+		r.live[l.Key] = l
 		root, ok := roots[l.Key]
 		if !ok {
 			root = l.Key
@@ -120,13 +128,41 @@ func (r *Report) AddLive(live []scan.LiveResource, now time.Time) {
 		r.Totals.KgCO2Mo += f.KgCO2Mo
 		r.Findings = append(r.Findings, f)
 	}
-	sort.SliceStable(r.Findings, func(i, j int) bool {
-		a, b := r.Findings[i], r.Findings[j]
-		if a.USDMo != b.USDMo {
-			return a.USDMo > b.USDMo
+	_ = r.Sort("cost")
+}
+
+// Sort orders Findings by cost (descending), type, or age (oldest first,
+// unknown age last). Ties keep cost order.
+func (r *Report) Sort(by string) error {
+	byCost := func(a, b Finding) int {
+		return cmp.Or(cmp.Compare(b.USDMo, a.USDMo), strings.Compare(a.ID, b.ID))
+	}
+	var then func(a, b Finding) int
+	switch by {
+	case "cost":
+		then = func(Finding, Finding) int { return 0 }
+	case "type":
+		then = func(a, b Finding) int { return strings.Compare(a.Type, b.Type) }
+	case "age":
+		then = func(a, b Finding) int {
+			if a.AgeDays == nil || b.AgeDays == nil {
+				return cmp.Compare(ageRank(a), ageRank(b))
+			}
+			return cmp.Compare(*b.AgeDays, *a.AgeDays)
 		}
-		return a.ID < b.ID
-	})
+	default:
+		return fmt.Errorf("unknown sort %q: want cost, type or age", by)
+	}
+	slices.SortStableFunc(r.Findings, func(a, b Finding) int { return cmp.Or(then(a, b), byCost(a, b)) })
+	return nil
+}
+
+// ageRank puts known ages before unknown ones.
+func ageRank(f Finding) int {
+	if f.AgeDays == nil {
+		return 1
+	}
+	return 0
 }
 
 // AddDrift records Drift Findings. Call after AddLive: a drifted resource
@@ -134,7 +170,8 @@ func (r *Report) AddLive(live []scan.LiveResource, now time.Time) {
 // costed and adds nothing to the totals.
 func (r *Report) AddDrift(drifts []plan.Drift) {
 	for _, d := range drifts {
-		drift := &Drift{Changed: d.Changed(), Deleted: d.Deleted}
+		r.drifts[d.Address] = d
+		drift :=&Drift{Changed: d.Changed(), Deleted: d.Deleted}
 		i := slices.IndexFunc(r.Findings, func(f Finding) bool { return f.Address == d.Address })
 		if i >= 0 {
 			r.Findings[i].Drift = drift
@@ -150,15 +187,24 @@ func (r *Report) WriteJSON(w io.Writer) error {
 	return enc.Encode(r)
 }
 
-func (r *Report) WriteTable(w io.Writer) error {
+// WriteTable writes the full report: Drift, then Unmanaged & idle, then the footer.
+func (r *Report) WriteTable(w io.Writer) error { return r.writeTable(w, true) }
+
+// WriteUnmanagedTable writes the report without the Drift section.
+func (r *Report) WriteUnmanagedTable(w io.Writer) error { return r.writeTable(w, false) }
+
+func (r *Report) writeTable(w io.Writer, withDrift bool) error {
 	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
-	fmt.Fprint(tw, "Drift\nADDRESS\tTYPE\tCHANGED\n")
-	drifted := slices.DeleteFunc(slices.Clone(r.Findings), func(f Finding) bool { return f.Drift == nil })
-	slices.SortFunc(drifted, func(a, b Finding) int { return strings.Compare(a.Address, b.Address) })
-	for _, f := range drifted {
-		fmt.Fprintf(tw, "%s\t%s\t%s\n", f.Address, f.Type, f.Drift.summary())
+	if withDrift {
+		fmt.Fprint(tw, "Drift\nADDRESS\tTYPE\tCHANGED\n")
+		drifted := slices.DeleteFunc(slices.Clone(r.Findings), func(f Finding) bool { return f.Drift == nil })
+		slices.SortFunc(drifted, func(a, b Finding) int { return strings.Compare(a.Address, b.Address) })
+		for _, f := range drifted {
+			fmt.Fprintf(tw, "%s\t%s\t%s\n", f.Address, f.Type, f.Drift.summary())
+		}
+		fmt.Fprint(tw, "\n")
 	}
-	fmt.Fprint(tw, "\nUnmanaged & idle\nTYPE\tID\tNAME\tSTATUS\tAGE\t$/MO\tkgCO₂/MO\n")
+	fmt.Fprint(tw, "Unmanaged & idle\nTYPE\tID\tNAME\tSTATUS\tAGE\t$/MO\tkgCO₂/MO\n")
 	for _, f := range r.Findings {
 		if !f.Unmanaged && f.Idle == nil {
 			continue
@@ -212,4 +258,79 @@ func age(days *float64) string {
 		return "-"
 	}
 	return fmt.Sprintf("%.0fd", *days)
+}
+
+// Explain writes the detail behind the Finding with this ID: the
+// attribute-level before/after for a Drift address; type, ARN, tags, creation
+// time, idle reason, cost math and carbon for an Unmanaged or Idle Resource.
+// False when no Finding has that ID.
+func (r *Report) Explain(w io.Writer, id string) bool {
+	if d, ok := r.drifts[id]; ok {
+		d.Explain(w)
+		return true
+	}
+	i := slices.IndexFunc(r.Findings, func(f Finding) bool { return f.ID == id && (f.Unmanaged || f.Idle != nil) })
+	if i < 0 {
+		return false
+	}
+	f, l := r.Findings[i], r.live[id]
+	var tags []string
+	for _, k := range slices.Sorted(maps.Keys(l.Tags)) {
+		tags = append(tags, k+"="+l.Tags[k])
+	}
+	created := "-"
+	if l.Created != nil {
+		created = fmt.Sprintf("%s (%.0f days ago)", l.Created.Format(time.DateOnly), *f.AgeDays)
+	}
+	idle := "-"
+	if f.Idle != nil {
+		idle = *f.Idle
+	}
+	fmt.Fprintf(w, "type:     %s\nid:       %s\narn:      %s\ntags:     %s\ncreated:  %s\nstatus:   %s\nidle:     %s\n",
+		f.Type, f.ID, dash(l.ARN), dash(strings.Join(tags, ", ")), created, f.status(), idle)
+	fmt.Fprintf(w, "cost:     %s\n", pricing.Math(r.Scan.Region, l))
+	for _, k := range l.Derived {
+		if d, ok := r.live[k]; ok {
+			fmt.Fprintf(w, "          + %s: %s\n", k, pricing.Math(r.Scan.Region, d))
+		}
+	}
+	fmt.Fprintf(w, "          = $%.2f/mo (estimate)\ncarbon:   ~%.1f kgCO₂/mo (estimate)\n", f.USDMo, f.KgCO2Mo)
+	return true
+}
+
+// WriteImports writes an import block for each Unmanaged Finding in ids,
+// addressed aws_<type>.<Name-tag slug, else ID slug>, for the user to feed to
+// tofu plan -generate-config-out. Writes nothing if any id is not an
+// Unmanaged Finding.
+func (r *Report) WriteImports(w io.Writer, ids []string) error {
+	var b strings.Builder
+	b.WriteString("# Generated by tofu-drift. Addresses are placeholders: rename them before apply.\n" +
+		"# Then run: tofu plan -generate-config-out=generated.tf\n")
+	seen := map[string]int{}
+	for _, id := range ids {
+		i := slices.IndexFunc(r.Findings, func(f Finding) bool { return f.ID == id && f.Unmanaged })
+		if i < 0 {
+			return fmt.Errorf("%s: no Unmanaged Finding with that ID", id)
+		}
+		f := r.Findings[i]
+		addr := f.Type + "." + cmp.Or(slug(f.Name), slug(f.ID))
+		if seen[addr]++; seen[addr] > 1 {
+			addr += fmt.Sprintf("_%d", seen[addr])
+		}
+		fmt.Fprintf(&b, "\nimport {\n  to = %s\n  id = %s\n}\n", addr, strconv.Quote(f.ID))
+	}
+	_, err := io.WriteString(w, b.String())
+	return err
+}
+
+var nonIdent = regexp.MustCompile(`[^a-z0-9_-]+`)
+
+// slug makes s a valid resource name: lowercase letters, digits, _ and -,
+// starting with a letter or _.
+func slug(s string) string {
+	s = strings.Trim(nonIdent.ReplaceAllString(strings.ToLower(s), "_"), "_")
+	if s != "" && (s[0] < 'a' || s[0] > 'z') {
+		s = "_" + s
+	}
+	return s
 }

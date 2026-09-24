@@ -85,3 +85,24 @@ func TestMonthlyFlat(t *testing.T) {
 		}
 	}
 }
+
+func TestMath(t *testing.T) {
+	for _, tc := range []struct {
+		region string
+		r      scan.LiveResource
+		want   string
+	}{
+		{"us-east-1", scan.LiveResource{Type: "aws_ebs_volume", Class: "gp3", SizeGB: 100}, "gp3 100 GB × $0.08/GB-mo = $8.00/mo"},
+		{"us-east-1", scan.LiveResource{Type: "aws_ebs_snapshot", SizeGB: 100}, "100 GB × $0.05/GB-mo = $5.00/mo"},
+		{"us-east-1", scan.LiveResource{Type: "aws_eip"}, "$0.005/h × 730 h = $3.65/mo"},
+		{"us-east-1", scan.LiveResource{Type: "aws_lb", Class: "application"}, "application $0.0225/h × 730 h = $16.43/mo"},
+		{"us-east-1", scan.LiveResource{Type: "aws_instance", Class: "t3.large"}, "t3.large $0.0832/h × 730 h = $60.74/mo"},
+		{"xx-nowhere-1", scan.LiveResource{Type: "aws_instance", Class: "t3.large"}, "t3.large $0.0832/h × 730 h = $60.74/mo (≈ us-east-1 price)"},
+		{"us-east-1", scan.LiveResource{Type: "aws_instance", Class: "t3.large", Stopped: true}, "t3.large stopped, no compute charge = $0.00/mo"},
+		{"us-east-1", scan.LiveResource{Type: "aws_security_group"}, "not priced = $0.00/mo"},
+	} {
+		if got := Math(tc.region, tc.r); got != tc.want {
+			t.Errorf("%s %s: got %q, want %q", tc.region, tc.r.Type, got, tc.want)
+		}
+	}
+}

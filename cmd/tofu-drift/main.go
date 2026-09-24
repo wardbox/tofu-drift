@@ -27,7 +27,7 @@ func main() {
 		SilenceUsage:  true,
 		SilenceErrors: true,
 	}
-	root.AddCommand(scanCmd())
+	root.AddCommand(scanCmd(), unmanagedCmd(), importGenCmd())
 
 	err := root.Execute()
 	switch {

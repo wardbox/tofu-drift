@@ -114,126 +114,201 @@ var callerAccount = func(ctx context.Context, cfg aws.Config) (string, error) {
 	return aws.ToString(out.Account), nil
 }
 
+// pipeline is the Scan shared by scan, unmanaged and import-gen, which
+// differ only in output.
+type pipeline struct {
+	statePath, region, profile, configPath string
+	includeDefaults                        bool
+}
+
+func (p *pipeline) flags(cmd *cobra.Command) {
+	cmd.Flags().StringVar(&p.statePath, "state", "", "state file: local path or s3://bucket/key (default: tofu state pull in the current root module)")
+	cmd.Flags().StringVar(&p.region, "region", "", "AWS region to scan (default: from environment or profile)")
+	cmd.Flags().StringVar(&p.profile, "profile", "", "AWS shared config profile")
+	cmd.Flags().BoolVar(&p.includeDefaults, "include-defaults", false, "report Default Furniture: the default VPC and its subnets, main route tables, default security groups")
+	cmd.Flags().StringVar(&p.configPath, "config", "tofu-drift.toml", "config file with Ignore Rules (optional unless given)")
+}
+
+// run loads config and state, plans for Drift when withDrift, lists live
+// resources and builds the Report with Ignore Rules applied.
+func (p *pipeline) run(cmd *cobra.Command, withDrift bool) (*report.Report, error) {
+	ctx := cmd.Context()
+	conf, err := driftconfig.Load(p.configPath, cmd.Flags().Changed("config"))
+	if err != nil {
+		return nil, err
+	}
+	var opts []func(*config.LoadOptions) error
+	if p.region != "" {
+		opts = append(opts, config.WithRegion(p.region))
+	}
+	if p.profile != "" {
+		opts = append(opts, config.WithSharedConfigProfile(p.profile))
+	}
+	cfg, err := config.LoadDefaultConfig(ctx, opts...)
+	if err != nil {
+		return nil, err
+	}
+	if err := retrieveCredentials(ctx, cfg); err != nil {
+		fmt.Fprintln(cmd.ErrOrStderr(), "tofu-drift needs read-only AWS credentials. Attach this IAM policy (iam-policy.json) to the role or user you scan with (add s3:GetObject on the state object to read s3:// state):")
+		fmt.Fprint(cmd.OutOrStdout(), string(tofudrift.IAMPolicy))
+		return nil, fmt.Errorf("no AWS credentials: %w", err)
+	}
+	dir, err := os.Getwd()
+	if err != nil {
+		return nil, err
+	}
+	src := &state.Source{
+		Dir:      dir,
+		LookPath: lookPath,
+		Run:      runTool,
+		GetS3: func(ctx context.Context, bucket, key string) (io.ReadCloser, error) {
+			out, err := s3.NewFromConfig(cfg).GetObject(ctx, &s3.GetObjectInput{Bucket: &bucket, Key: &key})
+			if err != nil {
+				return nil, err
+			}
+			return out.Body, nil
+		},
+	}
+	managed, source, err := src.Load(ctx, p.statePath)
+	if err != nil {
+		return nil, err
+	}
+
+	if cfg.Region == "" {
+		return nil, fmt.Errorf("no AWS region: pass --region or set AWS_REGION")
+	}
+	meta := report.Scan{Region: cfg.Region, StateSource: source}
+	regions, accounts := state.Locations(managed)
+	if list := countsExcept(regions, meta.Region); meta.Region != "" && list != "" {
+		fmt.Fprintf(cmd.ErrOrStderr(), "notice: state references resources in regions not scanned (scanning %s): %s\n", meta.Region, list)
+	}
+	// Only look up the caller when state has accounts to compare.
+	if len(accounts) > 0 {
+		meta.Account, err = callerAccount(ctx, cfg)
+		if err != nil {
+			fmt.Fprintf(cmd.ErrOrStderr(), "notice: skipping state account check, caller identity unavailable: %v\n", err)
+		} else if list := countsExcept(accounts, meta.Account); meta.Account != "" && list != "" {
+			fmt.Fprintf(cmd.ErrOrStderr(), "warning: state ARNs belong to account %s, but credentials are for account %s\n", list, meta.Account)
+		}
+	}
+
+	var drifts []plan.Drift
+	switch {
+	case !withDrift:
+	case p.statePath != "":
+		fmt.Fprintln(cmd.ErrOrStderr(), "notice: --state given, skipping drift detection (no root module to plan against)")
+	default:
+		// state pull above already required .tf files and a binary.
+		drifts, err = (&plan.Runner{Dir: dir, LookPath: lookPath, Run: runTool}).Drift(ctx)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	live, err := listAll(ctx, cmd.ErrOrStderr(), newScanners(cfg))
+	if err != nil {
+		return nil, err
+	}
+	if !p.includeDefaults {
+		live = slices.DeleteFunc(live, match.Furniture)
+	}
+	r := report.New(meta, managed)
+	r.Ignore = conf.Ignored
+	r.AddLive(live, time.Now())
+	r.AddDrift(drifts)
+	return r, nil
+}
+
 func scanCmd() *cobra.Command {
-	var statePath, region, profile, explain, configPath string
-	var asJSON, includeDefaults bool
+	var p pipeline
+	var explain string
+	var asJSON bool
 	cmd := &cobra.Command{
 		Use:   "scan",
 		Short: "Report drift, unmanaged and idle resources",
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			ctx := cmd.Context()
-			conf, err := driftconfig.Load(configPath, cmd.Flags().Changed("config"))
+			r, err := p.run(cmd, true)
 			if err != nil {
 				return err
 			}
-			var opts []func(*config.LoadOptions) error
-			if region != "" {
-				opts = append(opts, config.WithRegion(region))
-			}
-			if profile != "" {
-				opts = append(opts, config.WithSharedConfigProfile(profile))
-			}
-			cfg, err := config.LoadDefaultConfig(ctx, opts...)
-			if err != nil {
-				return err
-			}
-			if err := retrieveCredentials(ctx, cfg); err != nil {
-				fmt.Fprintln(cmd.ErrOrStderr(), "tofu-drift needs read-only AWS credentials. Attach this IAM policy (iam-policy.json) to the role or user you scan with (add s3:GetObject on the state object to read s3:// state):")
-				fmt.Fprint(cmd.OutOrStdout(), string(tofudrift.IAMPolicy))
-				return fmt.Errorf("no AWS credentials: %w", err)
-			}
-			dir, err := os.Getwd()
-			if err != nil {
-				return err
-			}
-			src := &state.Source{
-				Dir:      dir,
-				LookPath: lookPath,
-				Run:      runTool,
-				GetS3: func(ctx context.Context, bucket, key string) (io.ReadCloser, error) {
-					out, err := s3.NewFromConfig(cfg).GetObject(ctx, &s3.GetObjectInput{Bucket: &bucket, Key: &key})
-					if err != nil {
-						return nil, err
-					}
-					return out.Body, nil
-				},
-			}
-			managed, source, err := src.Load(ctx, statePath)
-			if err != nil {
-				return err
-			}
-
-			if cfg.Region == "" {
-				return fmt.Errorf("no AWS region: pass --region or set AWS_REGION")
-			}
-			meta := report.Scan{Region: cfg.Region, StateSource: source}
-			regions, accounts := state.Locations(managed)
-			if list := countsExcept(regions, meta.Region); meta.Region != "" && list != "" {
-				fmt.Fprintf(cmd.ErrOrStderr(), "notice: state references resources in regions not scanned (scanning %s): %s\n", meta.Region, list)
-			}
-			// Only look up the caller when state has accounts to compare.
-			if len(accounts) > 0 {
-				meta.Account, err = callerAccount(ctx, cfg)
-				if err != nil {
-					fmt.Fprintf(cmd.ErrOrStderr(), "notice: skipping state account check, caller identity unavailable: %v\n", err)
-				} else if list := countsExcept(accounts, meta.Account); meta.Account != "" && list != "" {
-					fmt.Fprintf(cmd.ErrOrStderr(), "warning: state ARNs belong to account %s, but credentials are for account %s\n", list, meta.Account)
-				}
-			}
-
-			var drifts []plan.Drift
-			if statePath != "" {
-				fmt.Fprintln(cmd.ErrOrStderr(), "notice: --state given, skipping drift detection (no root module to plan against)")
-			} else {
-				// state pull above already required .tf files and a binary.
-				drifts, err = (&plan.Runner{Dir: dir, LookPath: lookPath, Run: runTool}).Drift(ctx)
-				if err != nil {
-					return err
-				}
-			}
-			if explain != "" {
-				i := slices.IndexFunc(drifts, func(d plan.Drift) bool { return d.Address == explain })
-				if i < 0 {
-					return fmt.Errorf("--explain %q: no Drift with that address", explain)
-				}
-				drifts[i].Explain(cmd.OutOrStdout())
-				return errFindings
-			}
-
-			live, err := listAll(ctx, cmd.ErrOrStderr(), newScanners(cfg))
-			if err != nil {
-				return err
-			}
-			if !includeDefaults {
-				live = slices.DeleteFunc(live, match.Furniture)
-			}
-			r := report.New(meta, managed)
-			r.Ignore = conf.Ignored
-			r.AddLive(live, time.Now())
-			r.AddDrift(drifts)
-			out := cmd.OutOrStdout()
-			if asJSON {
-				err = r.WriteJSON(out)
-			} else {
-				err = r.WriteTable(out)
-			}
-			if err != nil {
-				return err
-			}
-			if len(r.Findings) > 0 {
-				return errFindings
-			}
-			return nil
+			return render(cmd, r, explain, asJSON, r.WriteTable)
 		},
 	}
-	cmd.Flags().StringVar(&statePath, "state", "", "state file: local path or s3://bucket/key (default: tofu state pull in the current root module)")
-	cmd.Flags().StringVar(&region, "region", "", "AWS region to scan (default: from environment or profile)")
-	cmd.Flags().StringVar(&profile, "profile", "", "AWS shared config profile")
-	cmd.Flags().BoolVar(&includeDefaults, "include-defaults", false, "report Default Furniture: the default VPC and its subnets, main route tables, default security groups")
-	cmd.Flags().StringVar(&configPath, "config", "tofu-drift.toml", "config file with Ignore Rules (optional unless given)")
+	p.flags(cmd)
 	cmd.Flags().BoolVar(&asJSON, "json", false, "emit JSON instead of a table")
-	cmd.Flags().StringVar(&explain, "explain", "", "print the attribute-level before/after for the Drift at this resource address")
+	cmd.Flags().StringVar(&explain, "explain", "", "explain one Finding: a Drift address, or the AWS ID of an Unmanaged or Idle Resource")
 	return cmd
+}
+
+func unmanagedCmd() *cobra.Command {
+	var p pipeline
+	var explain, sortBy string
+	var asJSON bool
+	cmd := &cobra.Command{
+		Use:   "unmanaged",
+		Short: "Report only unmanaged and idle resources",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			// Fail on a bad --sort before the slow part.
+			if err := report.New(report.Scan{}, nil).Sort(sortBy); err != nil {
+				return err
+			}
+			r, err := p.run(cmd, false)
+			if err != nil {
+				return err
+			}
+			_ = r.Sort(sortBy)
+			return render(cmd, r, explain, asJSON, r.WriteUnmanagedTable)
+		},
+	}
+	p.flags(cmd)
+	cmd.Flags().StringVar(&sortBy, "sort", "cost", "sort by cost, type or age (oldest first; unknown age last)")
+	cmd.Flags().BoolVar(&asJSON, "json", false, "emit JSON instead of a table")
+	cmd.Flags().StringVar(&explain, "explain", "", "explain one Finding by the AWS ID of an Unmanaged or Idle Resource")
+	return cmd
+}
+
+func importGenCmd() *cobra.Command {
+	var p pipeline
+	var ids []string
+	cmd := &cobra.Command{
+		Use:   "import-gen",
+		Short: "Print import blocks for Unmanaged Resources",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			r, err := p.run(cmd, false)
+			if err != nil {
+				return err
+			}
+			return r.WriteImports(cmd.OutOrStdout(), ids)
+		},
+	}
+	p.flags(cmd)
+	cmd.Flags().StringSliceVar(&ids, "ids", nil, "AWS IDs of Unmanaged Resources to import, comma-separated")
+	_ = cmd.MarkFlagRequired("ids")
+	return cmd
+}
+
+// render writes r as --explain, JSON or table, and signals Findings.
+func render(cmd *cobra.Command, r *report.Report, explain string, asJSON bool, table func(io.Writer) error) error {
+	out := cmd.OutOrStdout()
+	var err error
+	switch {
+	case explain != "":
+		if !r.Explain(out, explain) {
+			return fmt.Errorf("--explain %q: no Finding with that ID", explain)
+		}
+		return errFindings
+	case asJSON:
+		err = r.WriteJSON(out)
+	default:
+		err = table(out)
+	}
+	if err != nil {
+		return err
+	}
+	if len(r.Findings) > 0 {
+		return errFindings
+	}
+	return nil
 }
 
 // countsExcept formats the counts for every key except skip, sorted, as
