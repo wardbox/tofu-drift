@@ -20,9 +20,13 @@ const (
 // errFindings signals a successful scan that produced findings.
 var errFindings = errors.New("findings present")
 
+// version is set by goreleaser at release time.
+var version = "dev"
+
 func main() {
 	root := &cobra.Command{
 		Use:           "tofu-drift",
+		Version:       version,
 		Short:         "Find drift, unmanaged and idle AWS resources in an OpenTofu/Terraform state",
 		SilenceUsage:  true,
 		SilenceErrors: true,

@@ -1,0 +1,28 @@
+version: 2
+
+builds:
+  - main: ./cmd/tofu-drift
+    env: [CGO_ENABLED=0]
+    goos: [linux, darwin]
+    goarch: [amd64, arm64]
+
+archives:
+  - formats: [tar.gz]
+
+checksum:
+  name_template: checksums.txt
+
+brews:
+  - repository:
+      owner: wardbox
+      name: homebrew-tap
+      branch: main
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    homepage: https://github.com/wardbox/tofu-drift
+    description: Find drift, unmanaged and idle AWS resources in an OpenTofu/Terraform state
+    license: Apache-2.0
+    commit_author:
+      name: wardbox
+      email: 31261302+wardbox@users.noreply.github.com
+    test: |
+      system "#{bin}/tofu-drift", "--version"
