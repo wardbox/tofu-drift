@@ -1,0 +1,38 @@
+{
+  "Table": {
+    "AttributeDefinitions": [
+      {
+        "AttributeName": "id",
+        "AttributeType": "S"
+      }
+    ],
+    "TableName": "tdsbx-table",
+    "KeySchema": [
+      {
+        "AttributeName": "id",
+        "KeyType": "HASH"
+      }
+    ],
+    "TableStatus": "ACTIVE",
+    "CreationDateTime": "2026-09-23T20:52:26.099000-07:00",
+    "ProvisionedThroughput": {
+      "NumberOfDecreasesToday": 0,
+      "ReadCapacityUnits": 0,
+      "WriteCapacityUnits": 0
+    },
+    "TableSizeBytes": 0,
+    "ItemCount": 0,
+    "TableArn": "arn:aws:dynamodb:us-west-1:123456789012:table/tdsbx-table",
+    "TableId": "00749d99-6605-4b3c-a97b-cd7f35cb9452",
+    "BillingModeSummary": {
+      "BillingMode": "PAY_PER_REQUEST",
+      "LastUpdateToPayPerRequestDateTime": "2026-09-23T20:52:26.099000-07:00"
+    },
+    "DeletionProtectionEnabled": false,
+    "WarmThroughput": {
+      "ReadUnitsPerSecond": 12000,
+      "WriteUnitsPerSecond": 4000,
+      "Status": "ACTIVE"
+    }
+  }
+}

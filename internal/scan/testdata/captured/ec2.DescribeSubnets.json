@@ -1,0 +1,76 @@
+{
+  "Subnets": [
+    {
+      "AvailabilityZoneId": "usw1-az1",
+      "MapCustomerOwnedIpOnLaunch": false,
+      "OwnerId": "123456789012",
+      "AssignIpv6AddressOnCreation": false,
+      "Ipv6CidrBlockAssociationSet": [],
+      "Tags": [
+        {
+          "Key": "tofu-drift-sandbox",
+          "Value": "tdsbx"
+        },
+        {
+          "Key": "Name",
+          "Value": "tdsbx-subnet-0"
+        }
+      ],
+      "SubnetArn": "arn:aws:ec2:us-west-1:123456789012:subnet/subnet-0b4768cf8f73de84b",
+      "EnableDns64": false,
+      "Ipv6Native": false,
+      "PrivateDnsNameOptionsOnLaunch": {
+        "HostnameType": "ip-name",
+        "EnableResourceNameDnsARecord": false,
+        "EnableResourceNameDnsAAAARecord": false
+      },
+      "BlockPublicAccessStates": {
+        "InternetGatewayBlockMode": "off"
+      },
+      "SubnetId": "subnet-0b4768cf8f73de84b",
+      "State": "available",
+      "VpcId": "vpc-06477faef5ba8c81b",
+      "CidrBlock": "10.42.0.0/24",
+      "AvailableIpAddressCount": 248,
+      "AvailabilityZone": "us-west-1a",
+      "DefaultForAz": false,
+      "MapPublicIpOnLaunch": false
+    },
+    {
+      "AvailabilityZoneId": "usw1-az3",
+      "MapCustomerOwnedIpOnLaunch": false,
+      "OwnerId": "123456789012",
+      "AssignIpv6AddressOnCreation": false,
+      "Ipv6CidrBlockAssociationSet": [],
+      "Tags": [
+        {
+          "Key": "tofu-drift-sandbox",
+          "Value": "tdsbx"
+        },
+        {
+          "Key": "Name",
+          "Value": "tdsbx-subnet-1"
+        }
+      ],
+      "SubnetArn": "arn:aws:ec2:us-west-1:123456789012:subnet/subnet-028f0295af9f3a161",
+      "EnableDns64": false,
+      "Ipv6Native": false,
+      "PrivateDnsNameOptionsOnLaunch": {
+        "HostnameType": "ip-name",
+        "EnableResourceNameDnsARecord": false,
+        "EnableResourceNameDnsAAAARecord": false
+      },
+      "BlockPublicAccessStates": {
+        "InternetGatewayBlockMode": "off"
+      },
+      "SubnetId": "subnet-028f0295af9f3a161",
+      "State": "available",
+      "VpcId": "vpc-06477faef5ba8c81b",
+      "CidrBlock": "10.42.1.0/24",
+      "AvailableIpAddressCount": 251,
+      "AvailabilityZone": "us-west-1c",
+      "DefaultForAz": false,
+      "MapPublicIpOnLaunch": false
+    }
+  ]
+}

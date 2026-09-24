@@ -1,0 +1,60 @@
+{
+  "AutoScalingGroups": [
+    {
+      "AutoScalingGroupName": "tdsbx-asg",
+      "AutoScalingGroupARN": "arn:aws:autoscaling:us-west-1:123456789012:autoScalingGroup:a8ae8a37-f2ca-4f10-b2da-9a2166062630:autoScalingGroupName/tdsbx-asg",
+      "LaunchTemplate": {
+        "LaunchTemplateId": "lt-0c9b1de003bff9146",
+        "LaunchTemplateName": "tdsbx-lt-36a2ceb9b2bcc1d0f38a8db6b2",
+        "Version": "$Latest"
+      },
+      "MinSize": 0,
+      "MaxSize": 0,
+      "DesiredCapacity": 0,
+      "DefaultCooldown": 300,
+      "AvailabilityZones": [
+        "us-west-1a",
+        "us-west-1c"
+      ],
+      "AvailabilityZoneIds": [
+        "usw1-az1",
+        "usw1-az3"
+      ],
+      "LoadBalancerNames": [],
+      "TargetGroupARNs": [],
+      "HealthCheckType": "EC2",
+      "HealthCheckGracePeriod": 300,
+      "Instances": [],
+      "CreatedTime": "2026-09-24T03:52:33.591000+00:00",
+      "SuspendedProcesses": [],
+      "VPCZoneIdentifier": "subnet-0b4768cf8f73de84b,subnet-028f0295af9f3a161",
+      "EnabledMetrics": [],
+      "Tags": [
+        {
+          "ResourceId": "tdsbx-asg",
+          "ResourceType": "auto-scaling-group",
+          "Key": "tofu-drift-sandbox",
+          "Value": "tdsbx",
+          "PropagateAtLaunch": true
+        }
+      ],
+      "TerminationPolicies": [
+        "Default"
+      ],
+      "NewInstancesProtectedFromScaleIn": false,
+      "ServiceLinkedRoleARN": "arn:aws:iam::123456789012:role/aws-service-role/autoscaling.amazonaws.com/AWSServiceRoleForAutoScaling",
+      "TrafficSources": [],
+      "AvailabilityZoneDistribution": {
+        "CapacityDistributionStrategy": "balanced-best-effort"
+      },
+      "CapacityReservationSpecification": {
+        "CapacityReservationPreference": "default"
+      },
+      "InstanceLifecyclePolicy": {
+        "RetentionTriggers": {
+          "TerminateHookAbandon": "terminate"
+        }
+      }
+    }
+  ]
+}

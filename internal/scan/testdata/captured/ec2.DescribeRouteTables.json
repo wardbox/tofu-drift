@@ -1,0 +1,79 @@
+{
+  "RouteTables": [
+    {
+      "Associations": [
+        {
+          "Main": false,
+          "RouteTableAssociationId": "rtbassoc-01594fbfd1cf5bd3d",
+          "RouteTableId": "rtb-02a3e8bddfe62770b",
+          "SubnetId": "subnet-0b4768cf8f73de84b",
+          "AssociationState": {
+            "State": "associated"
+          }
+        },
+        {
+          "Main": false,
+          "RouteTableAssociationId": "rtbassoc-0cb42ea5276f6ab69",
+          "RouteTableId": "rtb-02a3e8bddfe62770b",
+          "SubnetId": "subnet-028f0295af9f3a161",
+          "AssociationState": {
+            "State": "associated"
+          }
+        }
+      ],
+      "PropagatingVgws": [],
+      "RouteTableId": "rtb-02a3e8bddfe62770b",
+      "Routes": [
+        {
+          "DestinationCidrBlock": "10.42.0.0/16",
+          "GatewayId": "local",
+          "Origin": "CreateRouteTable",
+          "State": "active"
+        },
+        {
+          "DestinationCidrBlock": "0.0.0.0/0",
+          "GatewayId": "igw-0ea4df03e6b2d8f2c",
+          "Origin": "CreateRoute",
+          "State": "active"
+        }
+      ],
+      "Tags": [
+        {
+          "Key": "tofu-drift-sandbox",
+          "Value": "tdsbx"
+        },
+        {
+          "Key": "Name",
+          "Value": "tdsbx-rt"
+        }
+      ],
+      "VpcId": "vpc-06477faef5ba8c81b",
+      "OwnerId": "123456789012"
+    },
+    {
+      "Associations": [
+        {
+          "Main": true,
+          "RouteTableAssociationId": "rtbassoc-062423ff2f9c61ddc",
+          "RouteTableId": "rtb-01c9f94a689dbfc24",
+          "AssociationState": {
+            "State": "associated"
+          }
+        }
+      ],
+      "PropagatingVgws": [],
+      "RouteTableId": "rtb-01c9f94a689dbfc24",
+      "Routes": [
+        {
+          "DestinationCidrBlock": "10.42.0.0/16",
+          "GatewayId": "local",
+          "Origin": "CreateRouteTable",
+          "State": "active"
+        }
+      ],
+      "Tags": [],
+      "VpcId": "vpc-06477faef5ba8c81b",
+      "OwnerId": "123456789012"
+    }
+  ]
+}

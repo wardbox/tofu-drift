@@ -1,0 +1,173 @@
+{
+  "Reservations": [
+    {
+      "ReservationId": "r-06d6b1fc61e356b26",
+      "OwnerId": "123456789012",
+      "Groups": [],
+      "Instances": [
+        {
+          "Architecture": "arm64",
+          "BlockDeviceMappings": [
+            {
+              "DeviceName": "/dev/xvda",
+              "Ebs": {
+                "AttachTime": "2026-09-24T03:52:32+00:00",
+                "DeleteOnTermination": true,
+                "Status": "attached",
+                "VolumeId": "vol-03296e07969f3197f",
+                "EbsCardIndex": 0
+              }
+            },
+            {
+              "DeviceName": "/dev/sdf",
+              "Ebs": {
+                "AttachTime": "2026-09-24T03:52:53.824000+00:00",
+                "DeleteOnTermination": false,
+                "Status": "attached",
+                "VolumeId": "vol-064471b497294d84e",
+                "EbsCardIndex": 0
+              }
+            }
+          ],
+          "ClientToken": "terraform-xHZlDgxNlxoO9CZISbB1Xdzab7",
+          "EbsOptimized": false,
+          "EnaSupport": true,
+          "Hypervisor": "xen",
+          "NetworkInterfaces": [
+            {
+              "Attachment": {
+                "AttachTime": "2026-09-24T03:52:31+00:00",
+                "AttachmentId": "eni-attach-0d8110dd8623d409c",
+                "DeleteOnTermination": true,
+                "DeviceIndex": 0,
+                "Status": "attached",
+                "NetworkCardIndex": 0
+              },
+              "Description": "",
+              "Groups": [
+                {
+                  "GroupId": "sg-02650871c4b541c45",
+                  "GroupName": "tdsbx-sg"
+                }
+              ],
+              "Ipv6Addresses": [],
+              "MacAddress": "02:01:e7:f9:74:b9",
+              "NetworkInterfaceId": "eni-0fff9e7f473e2fbbf",
+              "OwnerId": "123456789012",
+              "PrivateIpAddress": "10.42.0.29",
+              "PrivateIpAddresses": [
+                {
+                  "Primary": true,
+                  "PrivateIpAddress": "10.42.0.29"
+                }
+              ],
+              "SourceDestCheck": true,
+              "Status": "in-use",
+              "SubnetId": "subnet-0b4768cf8f73de84b",
+              "VpcId": "vpc-06477faef5ba8c81b",
+              "InterfaceType": "interface",
+              "Operator": {
+                "Managed": false
+              }
+            }
+          ],
+          "RootDeviceName": "/dev/xvda",
+          "RootDeviceType": "ebs",
+          "SecurityGroups": [
+            {
+              "GroupId": "sg-02650871c4b541c45",
+              "GroupName": "tdsbx-sg"
+            }
+          ],
+          "SourceDestCheck": true,
+          "StateReason": {
+            "Code": "Client.UserInitiatedShutdown",
+            "Message": "Client.UserInitiatedShutdown: User initiated shutdown"
+          },
+          "Tags": [
+            {
+              "Key": "tofu-drift-sandbox",
+              "Value": "tdsbx"
+            },
+            {
+              "Key": "Name",
+              "Value": "tdsbx-instance"
+            },
+            {
+              "Key": "Owner",
+              "Value": "someone-else"
+            }
+          ],
+          "VirtualizationType": "hvm",
+          "CpuOptions": {
+            "CoreCount": 2,
+            "ThreadsPerCore": 1
+          },
+          "CapacityReservationSpecification": {
+            "CapacityReservationPreference": "open"
+          },
+          "HibernationOptions": {
+            "Configured": false
+          },
+          "MetadataOptions": {
+            "State": "applied",
+            "HttpTokens": "required",
+            "HttpPutResponseHopLimit": 2,
+            "HttpEndpoint": "enabled",
+            "HttpProtocolIpv6": "disabled",
+            "InstanceMetadataTags": "disabled"
+          },
+          "EnclaveOptions": {
+            "Enabled": false
+          },
+          "BootMode": "uefi",
+          "PlatformDetails": "Linux/UNIX",
+          "UsageOperation": "RunInstances",
+          "UsageOperationUpdateTime": "2026-09-24T03:52:31+00:00",
+          "PrivateDnsNameOptions": {
+            "HostnameType": "ip-name",
+            "EnableResourceNameDnsARecord": false,
+            "EnableResourceNameDnsAAAARecord": false
+          },
+          "MaintenanceOptions": {
+            "AutoRecovery": "default",
+            "RebootMigration": "default"
+          },
+          "CurrentInstanceBootMode": "uefi",
+          "NetworkPerformanceOptions": {
+            "BandwidthWeighting": "default"
+          },
+          "Operator": {
+            "Managed": false,
+            "HiddenByDefault": false
+          },
+          "InstanceId": "i-06368f8a9da7ab277",
+          "ImageId": "ami-0c9bb41ac6320b1b6",
+          "State": {
+            "Code": 80,
+            "Name": "stopped"
+          },
+          "PrivateDnsName": "ip-10-42-0-29.us-west-1.compute.internal",
+          "PublicDnsName": "",
+          "StateTransitionReason": "User initiated (2026-09-24 03:52:53 GMT)",
+          "AmiLaunchIndex": 0,
+          "ProductCodes": [],
+          "InstanceType": "t4g.nano",
+          "LaunchTime": "2026-09-24T03:52:31+00:00",
+          "Placement": {
+            "AvailabilityZoneId": "usw1-az1",
+            "GroupName": "",
+            "Tenancy": "default",
+            "AvailabilityZone": "us-west-1a"
+          },
+          "Monitoring": {
+            "State": "disabled"
+          },
+          "SubnetId": "subnet-0b4768cf8f73de84b",
+          "VpcId": "vpc-06477faef5ba8c81b",
+          "PrivateIpAddress": "10.42.0.29"
+        }
+      ]
+    }
+  ]
+}

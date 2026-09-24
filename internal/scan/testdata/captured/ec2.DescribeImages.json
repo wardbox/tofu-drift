@@ -1,0 +1,44 @@
+{
+  "Images": [
+    {
+      "PlatformDetails": "Linux/UNIX",
+      "UsageOperation": "RunInstances",
+      "BlockDeviceMappings": [
+        {
+          "Ebs": {
+            "DeleteOnTermination": true,
+            "SnapshotId": "snap-099c5c6f033ec4678",
+            "VolumeSize": 1,
+            "VolumeType": "gp3",
+            "Encrypted": false
+          },
+          "DeviceName": "/dev/xvda"
+        }
+      ],
+      "Description": "",
+      "EnaSupport": true,
+      "Hypervisor": "xen",
+      "Name": "tdsbx-ami",
+      "RootDeviceName": "/dev/xvda",
+      "RootDeviceType": "ebs",
+      "SriovNetSupport": "simple",
+      "Tags": [
+        {
+          "Key": "tofu-drift-sandbox",
+          "Value": "tdsbx"
+        }
+      ],
+      "VirtualizationType": "hvm",
+      "DeregistrationProtection": "disabled",
+      "FreeTierEligible": true,
+      "ImageId": "ami-0bd49cfac2efd7bac",
+      "ImageLocation": "123456789012/tdsbx-ami",
+      "State": "available",
+      "OwnerId": "123456789012",
+      "CreationDate": "2026-09-24T03:53:26.000Z",
+      "Public": false,
+      "Architecture": "arm64",
+      "ImageType": "machine"
+    }
+  ]
+}

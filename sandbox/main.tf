@@ -4,8 +4,9 @@
 terraform {
   required_providers {
     aws = {
-      source  = "hashicorp/aws"
-      version = "~> 5.0"
+      source = "hashicorp/aws"
+      # 6.x: 5.x cannot read `aws login` (login_session) profiles.
+      version = "~> 6.0"
     }
     archive = {
       source  = "hashicorp/archive"
@@ -325,6 +326,10 @@ output "name_prefix" {
   value = var.name_prefix
 }
 
+output "vpc_id" {
+  value = aws_vpc.main.id
+}
+
 output "subnet_id" {
   value = aws_subnet.main[0].id
 }
@@ -351,4 +356,28 @@ output "log_group_name" {
 
 output "iam_role_name" {
   value = aws_iam_role.lambda.name
+}
+
+# --- A role carrying only iam-policy.json, to prove the policy covers a scan ---
+
+resource "aws_iam_role" "scanner" {
+  name = "${var.name_prefix}-scanner"
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect    = "Allow"
+      Action    = "sts:AssumeRole"
+      Principal = { AWS = "arn:aws:iam::${data.aws_caller_identity.me.account_id}:root" }
+    }]
+  })
+}
+
+resource "aws_iam_role_policy" "scanner" {
+  name   = "tofu-drift-read-only"
+  role   = aws_iam_role.scanner.id
+  policy = file("${path.module}/../iam-policy.json")
+}
+
+output "scanner_role_arn" {
+  value = aws_iam_role.scanner.arn
 }

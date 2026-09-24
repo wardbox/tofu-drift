@@ -1,0 +1,11 @@
+{
+  "Users": [
+    {
+      "Path": "/",
+      "UserName": "tdsbx-user",
+      "UserId": "AIDAEXAMPLEEXAMPLE",
+      "Arn": "arn:aws:iam::123456789012:user/tdsbx-user",
+      "CreateDate": "2026-09-24T03:52:26+00:00"
+    }
+  ]
+}

@@ -1,0 +1,143 @@
+{
+  "NetworkInterfaces": [
+    {
+      "Attachment": {
+        "AttachTime": "2026-09-24T03:52:31+00:00",
+        "AttachmentId": "eni-attach-0d8110dd8623d409c",
+        "DeleteOnTermination": true,
+        "DeviceIndex": 0,
+        "NetworkCardIndex": 0,
+        "InstanceId": "i-06368f8a9da7ab277",
+        "InstanceOwnerId": "123456789012",
+        "Status": "attached"
+      },
+      "AvailabilityZone": "us-west-1a",
+      "Description": "",
+      "Groups": [
+        {
+          "GroupId": "sg-02650871c4b541c45",
+          "GroupName": "tdsbx-sg"
+        }
+      ],
+      "InterfaceType": "interface",
+      "Ipv6Addresses": [],
+      "MacAddress": "02:01:e7:f9:74:b9",
+      "NetworkInterfaceId": "eni-0fff9e7f473e2fbbf",
+      "OwnerId": "123456789012",
+      "PublicDnsName": "",
+      "PrivateIpAddress": "10.42.0.29",
+      "PrivateIpAddresses": [
+        {
+          "Primary": true,
+          "PrivateIpAddress": "10.42.0.29"
+        }
+      ],
+      "RequesterManaged": false,
+      "SourceDestCheck": true,
+      "Status": "in-use",
+      "SubnetId": "subnet-0b4768cf8f73de84b",
+      "TagSet": [],
+      "VpcId": "vpc-06477faef5ba8c81b",
+      "Operator": {
+        "Managed": false,
+        "HiddenByDefault": false
+      },
+      "AvailabilityZoneId": "usw1-az1"
+    },
+    {
+      "Attachment": {
+        "AttachTime": "2026-09-24T03:53:32+00:00",
+        "AttachmentId": "eni-attach-0848fbcb28188f74a",
+        "DeleteOnTermination": false,
+        "DeviceIndex": 1,
+        "NetworkCardIndex": 0,
+        "InstanceOwnerId": "amazon-elb",
+        "Status": "attached"
+      },
+      "AvailabilityZone": "us-west-1a",
+      "Description": "ELB app/tdsbx-alb/a0fb401e97734c75",
+      "Groups": [
+        {
+          "GroupId": "sg-02650871c4b541c45",
+          "GroupName": "tdsbx-sg"
+        }
+      ],
+      "InterfaceType": "interface",
+      "Ipv6Addresses": [],
+      "MacAddress": "02:01:dd:fa:cd:fb",
+      "NetworkInterfaceId": "eni-07efccce2453c8859",
+      "OwnerId": "123456789012",
+      "PublicDnsName": "",
+      "PrivateIpAddress": "10.42.0.47",
+      "PrivateIpAddresses": [
+        {
+          "Primary": true,
+          "PrivateIpAddress": "10.42.0.47"
+        }
+      ],
+      "RequesterId": "amazon-elb",
+      "RequesterManaged": true,
+      "SourceDestCheck": true,
+      "Status": "in-use",
+      "SubnetId": "subnet-0b4768cf8f73de84b",
+      "TagSet": [],
+      "VpcId": "vpc-06477faef5ba8c81b",
+      "Operator": {
+        "Managed": false,
+        "HiddenByDefault": false
+      },
+      "AvailabilityZoneId": "usw1-az1"
+    },
+    {
+      "Association": {
+        "AllocationId": "eipalloc-0e418919abec57172",
+        "AssociationId": "eipassoc-02db2c4b32ea98a66",
+        "IpOwnerId": "123456789012",
+        "PublicDnsName": "",
+        "PublicIp": "203.0.113.10"
+      },
+      "Attachment": {
+        "AttachmentId": "ela-attach-0c8a49aa2fd52e602",
+        "DeleteOnTermination": false,
+        "DeviceIndex": 1,
+        "InstanceOwnerId": "amazon-aws",
+        "Status": "attached"
+      },
+      "AvailabilityZone": "us-west-1a",
+      "Description": "Interface for NAT Gateway nat-070535f9aa983d518",
+      "Groups": [],
+      "InterfaceType": "nat_gateway",
+      "Ipv6Addresses": [],
+      "MacAddress": "02:01:fa:f0:3c:b9",
+      "NetworkInterfaceId": "eni-0f1bfa93ad7feabba",
+      "OwnerId": "123456789012",
+      "PublicDnsName": "",
+      "PrivateIpAddress": "10.42.0.23",
+      "PrivateIpAddresses": [
+        {
+          "Association": {
+            "AllocationId": "eipalloc-0e418919abec57172",
+            "AssociationId": "eipassoc-02db2c4b32ea98a66",
+            "IpOwnerId": "123456789012",
+            "PublicDnsName": "",
+            "PublicIp": "203.0.113.10"
+          },
+          "Primary": true,
+          "PrivateIpAddress": "10.42.0.23"
+        }
+      ],
+      "RequesterId": "541253308265",
+      "RequesterManaged": true,
+      "SourceDestCheck": false,
+      "Status": "in-use",
+      "SubnetId": "subnet-0b4768cf8f73de84b",
+      "TagSet": [],
+      "VpcId": "vpc-06477faef5ba8c81b",
+      "Operator": {
+        "Managed": false,
+        "HiddenByDefault": false
+      },
+      "AvailabilityZoneId": "usw1-az1"
+    }
+  ]
+}

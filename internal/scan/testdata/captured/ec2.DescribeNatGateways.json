@@ -1,0 +1,39 @@
+{
+  "NatGateways": [
+    {
+      "CreateTime": "2026-09-24T03:56:07+00:00",
+      "NatGatewayAddresses": [
+        {
+          "AllocationId": "eipalloc-0e418919abec57172",
+          "NetworkInterfaceId": "eni-0f1bfa93ad7feabba",
+          "PrivateIp": "10.42.0.23",
+          "PublicIp": "203.0.113.10",
+          "AssociationId": "eipassoc-02db2c4b32ea98a66",
+          "IsPrimary": true,
+          "Status": "succeeded"
+        }
+      ],
+      "NatGatewayId": "nat-070535f9aa983d518",
+      "State": "available",
+      "SubnetId": "subnet-0b4768cf8f73de84b",
+      "VpcId": "vpc-06477faef5ba8c81b",
+      "Tags": [
+        {
+          "Key": "tofu-drift-sandbox",
+          "Value": "tdsbx"
+        },
+        {
+          "Key": "tofu-drift-sandbox-planted",
+          "Value": "true"
+        },
+        {
+          "Key": "Name",
+          "Value": "tdsbx-stray-nat"
+        }
+      ],
+      "ConnectivityType": "public",
+      "AvailabilityMode": "zonal",
+      "AttachedAppliances": []
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "HostedZones": [
+    {
+      "Id": "/hostedzone/Z10437931QWTHGYJIN0JB",
+      "Name": "tdsbx.sandbox.internal.",
+      "CallerReference": "terraform-7udxuyKsnVKDdvFVQz2kGIo2To",
+      "Config": {
+        "Comment": "Managed by Terraform",
+        "PrivateZone": true
+      },
+      "ResourceRecordSetCount": 2,
+      "Features": {}
+    }
+  ]
+}

@@ -1,0 +1,34 @@
+{
+  "LoadBalancers": [
+    {
+      "LoadBalancerArn": "arn:aws:elasticloadbalancing:us-west-1:123456789012:loadbalancer/app/tdsbx-alb/a0fb401e97734c75",
+      "DNSName": "internal-tdsbx-alb-1927040702.us-west-1.elb.amazonaws.com",
+      "CanonicalHostedZoneId": "Z368ELLRRE2KJ0",
+      "CreatedTime": "2026-09-24T03:52:30.936000+00:00",
+      "LoadBalancerName": "tdsbx-alb",
+      "Scheme": "internal",
+      "VpcId": "vpc-06477faef5ba8c81b",
+      "State": {
+        "Code": "active"
+      },
+      "Type": "application",
+      "AvailabilityZones": [
+        {
+          "ZoneName": "us-west-1c",
+          "SubnetId": "subnet-028f0295af9f3a161",
+          "LoadBalancerAddresses": []
+        },
+        {
+          "ZoneName": "us-west-1a",
+          "SubnetId": "subnet-0b4768cf8f73de84b",
+          "LoadBalancerAddresses": []
+        }
+      ],
+      "SecurityGroups": [
+        "sg-02650871c4b541c45"
+      ],
+      "IpAddressType": "ipv4",
+      "EnablePrefixForIpv6SourceNat": "off"
+    }
+  ]
+}

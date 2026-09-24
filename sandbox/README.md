@@ -19,7 +19,7 @@ us-east-1 on-demand prices. Other regions are within a few cents.
 | **NAT gateway** | **$0.045/h** + data | from `make-mess.sh` |
 | 2 Elastic IPs (planted, and the NAT gateway's) | $0.005/h each | from `make-mess.sh` |
 
-**Total: about $0.025/h for the stack alone, about $0.08/h after `make-mess.sh`.** A two-hour session costs well under $1. The NAT gateway is most of it, so run `teardown.sh` as soon as you have the screenshot and the fixtures.
+**Total: about $0.025/h for the stack alone, about $0.08/h after `make-mess.sh`.** A two-hour session costs well under $1. The NAT gateway is most of it, so run `teardown.sh` as soon as you have the screenshot and the fixtures. The first live run (us-west-1) kept the stack up about 25 minutes and the NAT gateway about 15, a few cents in all.
 
 ## Prerequisites
 
@@ -75,6 +75,21 @@ All commands run from the repo root unless noted.
 
    Expect at least 3 Drift rows (`aws_instance.main`, `aws_security_group.main`, `aws_cloudwatch_log_group.app`, `aws_lambda_function.main`, `aws_iam_role.lambda`) and at least 3 Unmanaged/Idle rows (the planted volume `unmanaged+idle`, the planted EIP `unmanaged+idle`, the NAT gateway `unmanaged`, with the NAT's own EIP folded into it). Try `--explain <id>` on one of each and `--json`. Anything else in the account shows up too; a fresh account should add nothing beyond Default Furniture, which is suppressed.
 
+   To check that `iam-policy.json` is enough, scan as the stack's `scanner` role, which carries only that policy and trusts the account root:
+
+   ```sh
+   (
+     read -r AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN < <(aws sts assume-role \
+       --role-arn "$(tofu output -raw scanner_role_arn)" --role-session-name policy-test \
+       --query 'Credentials.[AccessKeyId,SecretAccessKey,SessionToken]' --output text)
+     export AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN
+     unset AWS_PROFILE
+     /tmp/tofu-drift unmanaged --state terraform.tfstate --region "$(tofu output -raw region)"
+   )
+   ```
+
+   Any `notice: skipped ...` line names an action the policy is missing.
+
 6. **Take the README screenshot.** Use a terminal about 120 columns wide with a plain theme. Run `clear`, rerun the step 5 scan, and capture only the terminal window (on macOS, Cmd-Shift-4 then Space). If the account ID is visible, crop it out. Save the image as `docs/screenshot.png`, and add this line under the first paragraph of the top-level `README.md`:
 
    ```md
@@ -87,7 +102,7 @@ All commands run from the repo root unless noted.
    ./capture-fixtures.sh
    ```
 
-   This writes one JSON file per SDK call the scanners make to `internal/scan/testdata/captured/`, plus `cmd/tofu-drift/testdata/sandbox.tfstate` and `internal/plan/testdata/sandbox-show.json`. The account ID is replaced with `123456789012`. Read through the diff before committing. The files come from the `aws` CLI, so field names match the SDK output structs and `json.Unmarshal` into e.g. `ec2.DescribeVolumesOutput` should load them (check timestamps the first time). The follow-up is to swap each scanner test's hand-written happy-path fake for its captured file. Keep the hand-written fakes that test pagination and errors, since a small account won't paginate or fail.
+   This writes one JSON file per SDK call the scanners make to `internal/scan/testdata/captured/`, plus `cmd/tofu-drift/testdata/sandbox.tfstate` and `internal/plan/testdata/sandbox-show.json`. Every call is narrowed to the sandbox (by tag, VPC or `name_prefix`), so nothing else in the account is recorded. The account ID becomes `123456789012`, the caller `user/sandbox`, IAM unique IDs `AIDAEXAMPLEEXAMPLE` and the like, and public IPs `203.0.113.10`. Read through the diff before committing. The files come from the `aws` CLI, so `json.Unmarshal` loads them into the SDK output structs; `internal/scan/captured_test.go` runs every scanner on them, and `TestScanSandbox` in `cmd/tofu-drift` checks the report built from the state and plan. Their assertions name the recorded IDs, so a fresh capture means updating those.
 
 8. **Tear down promptly:**
 
@@ -95,4 +110,4 @@ All commands run from the repo root unless noted.
    ./teardown.sh
    ```
 
-   It deletes the NAT gateway and waits for it to go, releases the planted Elastic IPs, deletes the planted volume, runs `tofu destroy`, then lists any ARN still tagged `tofu-drift-sandbox`. The list should be empty. A deleted NAT gateway can stay listed for about an hour, and costs nothing once deleted. If `tofu destroy` fails partway, fix the cause and run `./teardown.sh` again; every step is safe to repeat.
+   It deletes the NAT gateway and waits for it to go, releases the planted Elastic IPs, deletes the planted volume, runs `tofu destroy`, then lists any ARN still tagged `tofu-drift-sandbox`. The list should be empty. The tagging API lags: for a while it can still list resources that are gone (terminated instances, deleted volumes and snapshots, INACTIVE ECS clusters, deleted NAT gateways), none of which cost anything. Describe one directly if in doubt. If `tofu destroy` fails partway, fix the cause and run `./teardown.sh` again; every step is safe to repeat.

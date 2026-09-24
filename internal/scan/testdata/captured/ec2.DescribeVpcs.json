@@ -1,0 +1,35 @@
+{
+  "Vpcs": [
+    {
+      "OwnerId": "123456789012",
+      "InstanceTenancy": "default",
+      "CidrBlockAssociationSet": [
+        {
+          "AssociationId": "vpc-cidr-assoc-0b393c3e04b05aa11",
+          "CidrBlock": "10.42.0.0/16",
+          "CidrBlockState": {
+            "State": "associated"
+          }
+        }
+      ],
+      "IsDefault": false,
+      "Tags": [
+        {
+          "Key": "Name",
+          "Value": "tdsbx-vpc"
+        },
+        {
+          "Key": "tofu-drift-sandbox",
+          "Value": "tdsbx"
+        }
+      ],
+      "BlockPublicAccessStates": {
+        "InternetGatewayBlockMode": "off"
+      },
+      "VpcId": "vpc-06477faef5ba8c81b",
+      "State": "available",
+      "CidrBlock": "10.42.0.0/16",
+      "DhcpOptionsId": "dopt-09c9a1db8054f9189"
+    }
+  ]
+}

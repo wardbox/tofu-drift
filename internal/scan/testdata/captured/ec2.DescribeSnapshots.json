@@ -1,0 +1,29 @@
+{
+  "Snapshots": [
+    {
+      "Tags": [
+        {
+          "Key": "Name",
+          "Value": "tdsbx-data-snap"
+        },
+        {
+          "Key": "tofu-drift-sandbox",
+          "Value": "tdsbx"
+        }
+      ],
+      "StorageTier": "standard",
+      "TransferType": "standard",
+      "CompletionTime": "2026-09-24T03:53:21.288000+00:00",
+      "FullSnapshotSizeInBytes": 0,
+      "SnapshotId": "snap-099c5c6f033ec4678",
+      "VolumeId": "vol-064471b497294d84e",
+      "State": "completed",
+      "StartTime": "2026-09-24T03:52:37.189000+00:00",
+      "Progress": "100%",
+      "OwnerId": "123456789012",
+      "Description": "",
+      "VolumeSize": 1,
+      "Encrypted": false
+    }
+  ]
+}

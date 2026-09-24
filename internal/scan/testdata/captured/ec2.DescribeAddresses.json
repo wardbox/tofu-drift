@@ -1,0 +1,50 @@
+{
+  "Addresses": [
+    {
+      "AllocationId": "eipalloc-0a3d468d4f54332a3",
+      "Domain": "vpc",
+      "Tags": [
+        {
+          "Key": "tofu-drift-sandbox-planted",
+          "Value": "true"
+        },
+        {
+          "Key": "tofu-drift-sandbox",
+          "Value": "tdsbx"
+        },
+        {
+          "Key": "Name",
+          "Value": "tdsbx-stray-eip"
+        }
+      ],
+      "PublicIpv4Pool": "amazon",
+      "NetworkBorderGroup": "us-west-1",
+      "PublicIp": "203.0.113.10"
+    },
+    {
+      "AllocationId": "eipalloc-0e418919abec57172",
+      "AssociationId": "eipassoc-02db2c4b32ea98a66",
+      "Domain": "vpc",
+      "NetworkInterfaceId": "eni-0f1bfa93ad7feabba",
+      "NetworkInterfaceOwnerId": "123456789012",
+      "PrivateIpAddress": "10.42.0.23",
+      "Tags": [
+        {
+          "Key": "tofu-drift-sandbox-planted",
+          "Value": "true"
+        },
+        {
+          "Key": "Name",
+          "Value": "tdsbx-nat-eip"
+        },
+        {
+          "Key": "tofu-drift-sandbox",
+          "Value": "tdsbx"
+        }
+      ],
+      "PublicIpv4Pool": "amazon",
+      "NetworkBorderGroup": "us-west-1",
+      "PublicIp": "203.0.113.10"
+    }
+  ]
+}
