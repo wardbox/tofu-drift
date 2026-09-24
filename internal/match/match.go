@@ -3,6 +3,8 @@
 package match
 
 import (
+	"strings"
+
 	"github.com/wardbox/tofu-drift/internal/scan"
 	"github.com/wardbox/tofu-drift/internal/state"
 )
@@ -39,6 +41,16 @@ var keyFor = map[string]func(attrs map[string]any) string{
 	"aws_elasticache_cluster":           attr("cluster_id"),
 	"aws_elasticache_replication_group": attr("replication_group_id"),
 	"aws_s3_bucket":                     attr("bucket"),
+
+	"aws_autoscaling_group": attr("id"),
+	"aws_eks_cluster":       attr("id"),
+	"aws_ecs_cluster":       attr("name"),
+	"aws_ecs_service": func(a map[string]any) string {
+		if attr("name")(a) == "" {
+			return ""
+		}
+		return scan.ECSServiceKey(attr("cluster")(a), attr("name")(a))
+	},
 }
 
 // liveType maps state types that adopt AWS-made resources, or are aliases or
@@ -81,22 +93,70 @@ func Index(rs []state.Resource) Managed {
 	return m
 }
 
-// Roots maps the key of every Derived Resource in live to the key of its
-// top-level parent, the one resource it is folded into.
-func Roots(live []scan.LiveResource) map[string]string {
-	parent := map[string]string{}
-	for _, l := range live {
+// parentBy finds, per Derived Resource type, a parent the resource does not
+// list itself: the parent's type and the Match Key AWS stamped on the child
+// as a tag or name. A parent a scanner lists as Derived wins over these.
+var parentBy = map[string]func(scan.LiveResource) (typ, key string){
+	// Managed nodegroup ASGs and nodes carry the cluster name.
+	"aws_autoscaling_group": tag("aws_eks_cluster", "eks:cluster-name"),
+	"aws_instance":          tag("aws_eks_cluster", "eks:cluster-name"),
+	"aws_network_interface": func(r scan.LiveResource) (string, string) {
+		// Control-plane ENIs are described "Amazon EKS <cluster>".
+		if c, ok := strings.CutPrefix(r.Name, "Amazon EKS "); ok {
+			return "aws_eks_cluster", c
+		}
+		// VPC CNI ENIs.
+		return tag("aws_eks_cluster", "cluster.k8s.amazonaws.com/name")(r)
+	},
+}
+
+func tag(typ, name string) func(scan.LiveResource) (string, string) {
+	return func(r scan.LiveResource) (string, string) { return typ, r.Tags[name] }
+}
+
+// Roots maps the index in live of every Derived Resource to the index of its
+// top-level parent, the one resource it is folded into. Indexes, not Match
+// Keys: names key several types (ASG, EKS cluster, ECS cluster) and can clash.
+func Roots(live []scan.LiveResource) map[int]int {
+	at := map[key]int{}
+	// Derived lists hold untyped AWS IDs (i-, vol-, sg-, eni-, ...).
+	byKey := map[string]int{}
+	for i, l := range live {
+		at[key{l.Type, l.Key}] = i
+		byKey[l.Key] = i
+	}
+	parent := map[int]int{}
+	for i, l := range live {
 		for _, d := range l.Derived {
-			parent[d] = l.Key
+			if c, ok := byKey[d]; ok && c != i {
+				parent[c] = i
+			}
 		}
 	}
-	roots := make(map[string]string, len(parent))
-	for d := range parent {
-		root := d
-		for p, ok := parent[root]; ok; p, ok = parent[root] {
+	for i, l := range live {
+		f, ok := parentBy[l.Type]
+		if _, listed := parent[i]; !ok || listed {
+			continue
+		}
+		// Only fold into a parent that is live, or the child would vanish.
+		if typ, k := f(l); k != "" {
+			if p, ok := at[key{typ, k}]; ok && p != i {
+				parent[i] = p
+			}
+		}
+	}
+	roots := make(map[int]int, len(parent))
+	for c := range parent {
+		root := c
+		// Bounded walk: a cycle of Derived links folds into wherever it stops.
+		for n := 0; n < len(live); n++ {
+			p, ok := parent[root]
+			if !ok {
+				break
+			}
 			root = p
 		}
-		roots[d] = root
+		roots[c] = root
 	}
 	return roots
 }
@@ -111,6 +171,7 @@ var furniture = map[string]func(scan.LiveResource) bool{
 	"aws_subnet":         isDefault,
 	"aws_route_table":    isDefault,
 	"aws_security_group": isDefault,
+	"aws_ecs_cluster":    isDefault,
 }
 
 func isDefault(r scan.LiveResource) bool { return r.Default }

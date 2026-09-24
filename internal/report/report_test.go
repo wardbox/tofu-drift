@@ -164,6 +164,53 @@ Unmanaged: $37/mo · Idle: $0/mo · ~4.0 kgCO₂/mo (≈ 0.01 trans-Atlantic fli
 	}
 }
 
+func TestAddLiveFoldsCompute(t *testing.T) {
+	eks := map[string]string{"eks:cluster-name": "prod"}
+	r := New(Scan{Region: "us-east-1"}, []state.Resource{
+		{Address: "aws_eks_cluster.prod", Type: "aws_eks_cluster", Attributes: map[string]any{"id": "prod"}},
+	})
+	r.AddLive([]scan.LiveResource{
+		// Unmanaged ASG: one row carrying its instances and their volumes.
+		{Type: "aws_autoscaling_group", Key: "web", Derived: []string{"i-1", "i-2"}},
+		{Type: "aws_instance", Key: "i-1", Class: "t3.large", Derived: []string{"vol-1"}},
+		{Type: "aws_instance", Key: "i-2", Class: "t3.large"},
+		{Type: "aws_ebs_volume", Key: "vol-1", Class: "gp3", SizeGB: 10},
+		// Managed EKS cluster: nodegroup, nodes, ENIs and SG all dropped.
+		{Type: "aws_eks_cluster", Key: "prod", Derived: []string{"sg-eks"}},
+		{Type: "aws_security_group", Key: "sg-eks"},
+		{Type: "aws_autoscaling_group", Key: "eks-ng", Tags: eks, Derived: []string{"i-ng"}},
+		{Type: "aws_instance", Key: "i-ng", Class: "t3.large", Tags: eks},
+		{Type: "aws_network_interface", Key: "eni-cp", Name: "Amazon EKS prod"},
+		{Type: "aws_network_interface", Key: "eni-idle", Idle: "unattached", Tags: map[string]string{"cluster.k8s.amazonaws.com/name": "prod"}},
+	}, time.Now())
+
+	if len(r.Findings) != 1 {
+		t.Fatalf("findings: %+v", r.Findings)
+	}
+	if f := r.Findings[0]; f.ID != "web" || !f.Unmanaged || math.Abs(f.USDMo-(2*0.0832*730+0.8)) > 1e-9 || f.KgCO2Mo == 0 {
+		t.Errorf("unmanaged asg: %+v", f)
+	}
+	if math.Abs(r.Totals.UnmanagedUSDMo-r.Findings[0].USDMo) > 1e-9 || r.Totals.IdleUSDMo != 0 {
+		t.Errorf("totals: %+v", r.Totals)
+	}
+}
+
+func TestAddLiveUnmanagedEKS(t *testing.T) {
+	r := New(Scan{Region: "us-east-1"}, nil)
+	r.AddLive([]scan.LiveResource{
+		{Type: "aws_eks_cluster", Key: "dev"},
+		{Type: "aws_instance", Key: "i-node", Class: "t3.large", Tags: map[string]string{"eks:cluster-name": "dev"}},
+		// Same name, other type: its own row, none of the EKS cost.
+		{Type: "aws_ecs_cluster", Key: "dev"},
+	}, time.Now())
+	if len(r.Findings) != 2 || r.Findings[1].Type != "aws_ecs_cluster" || r.Findings[1].USDMo != 0 {
+		t.Fatalf("findings: %+v", r.Findings)
+	}
+	if f := r.Findings[0]; f.ID != "dev" || math.Abs(f.USDMo-(0.10+0.0832)*730) > 1e-9 {
+		t.Errorf("control plane plus node: %+v", f)
+	}
+}
+
 func TestAddLiveFlatRate(t *testing.T) {
 	r := New(Scan{Region: "us-east-1"}, []state.Resource{
 		{Address: "aws_ami.golden", Type: "aws_ami", Attributes: map[string]any{"id": "ami-1"}},

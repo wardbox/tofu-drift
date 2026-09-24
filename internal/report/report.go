@@ -86,35 +86,28 @@ func New(meta Scan, managed []state.Resource) *Report {
 // Derived Resources are never rows; their cost rolls up into their parent.
 func (r *Report) AddLive(live []scan.LiveResource, now time.Time) {
 	roots := match.Roots(live)
-	// Costs are keyed by type and Match Key: names like "app" repeat across types.
-	parentType := map[string]string{}
-	for _, l := range live {
-		if len(l.Derived) > 0 {
-			parentType[l.Key] = l.Type
-		}
-	}
-	usd, kg, approx := map[string]float64{}, map[string]float64{}, map[string]bool{}
-	for _, l := range live {
+	// Costs are keyed by index in live: names like "app" repeat across types.
+	usd, kg, approx := make([]float64, len(live)), make([]float64, len(live)), make([]bool, len(live))
+	for i, l := range live {
 		// By type and key for Findings, by key alone for Derived lookups.
 		r.live[l.Type+" "+l.Key], r.live[l.Key] = l, l
-		root := l.Type + " " + l.Key
-		if p, ok := roots[l.Key]; ok {
-			root = parentType[p] + " " + p
+		root, ok := roots[i]
+		if !ok {
+			root = i
 		}
 		u, a := pricing.Monthly(r.Scan.Region, l)
 		usd[root] += u
 		approx[root] = approx[root] || a
 		kg[root] += carbon.Monthly(r.Scan.Region, l)
 	}
-	for _, l := range live {
-		if _, derived := roots[l.Key]; derived {
+	for i, l := range live {
+		if _, derived := roots[i]; derived {
 			continue
 		}
 		addr := r.managed.Lookup(l.Type, l.Key)
 		if addr != "" && l.Idle == "" || r.Ignore != nil && r.Ignore(l) {
 			continue
 		}
-		k := l.Type + " " + l.Key
 		f := Finding{
 			ID:        l.Key,
 			Address:   addr,
@@ -122,9 +115,9 @@ func (r *Report) AddLive(live []scan.LiveResource, now time.Time) {
 			Region:    cmp.Or(l.Region, r.Scan.Region),
 			Name:      l.Name,
 			Unmanaged: addr == "",
-			USDMo:     usd[k],
-			Approx:    approx[k],
-			KgCO2Mo:   kg[k],
+			USDMo:     usd[i],
+			Approx:    approx[i],
+			KgCO2Mo:   kg[i],
 			Note:      l.Note,
 		}
 		if l.Idle != "" {

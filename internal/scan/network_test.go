@@ -74,7 +74,7 @@ func TestNATList(t *testing.T) {
 func TestENIList(t *testing.T) {
 	got, err := ENIs{fakeNet{enis: []types.NetworkInterface{
 		{NetworkInterfaceId: aws.String("eni-free"), Status: types.NetworkInterfaceStatusAvailable, TagSet: nameTag("spare")},
-		{NetworkInterfaceId: aws.String("eni-used"), Status: types.NetworkInterfaceStatusInUse},
+		{NetworkInterfaceId: aws.String("eni-used"), Status: types.NetworkInterfaceStatusInUse, Description: aws.String("Amazon EKS prod")},
 		{NetworkInterfaceId: aws.String("eni-lambda"), Status: types.NetworkInterfaceStatusInUse, RequesterManaged: aws.Bool(true)},
 	}}}.List(context.Background())
 	if err != nil {
@@ -87,7 +87,7 @@ func TestENIList(t *testing.T) {
 	if free.Type != "aws_network_interface" || free.Key != "eni-free" || free.Name != "spare" || free.Idle != "unattached" {
 		t.Errorf("available: %+v", free)
 	}
-	if used.Key != "eni-used" || used.Idle != "" {
+	if used.Key != "eni-used" || used.Idle != "" || used.Name != "Amazon EKS prod" {
 		t.Errorf("in use: %+v", used)
 	}
 }
