@@ -51,7 +51,7 @@ func (r *Runner) Drift(ctx context.Context) ([]Drift, error) {
 		if err != nil {
 			return nil, err
 		}
-		defer os.RemoveAll(tmp)
+		defer func() { _ = os.RemoveAll(tmp) }()
 		planFile := filepath.Join(tmp, "refresh.tfplan")
 		if _, err := r.Run(ctx, r.Dir, bin, "plan", "-refresh-only", "-lock=false", "-input=false", "-no-color", "-out="+planFile); err != nil {
 			return nil, fmt.Errorf("%s plan -refresh-only: %w", name, err)
