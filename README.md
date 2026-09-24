@@ -2,6 +2,8 @@
 
 Compares an OpenTofu/Terraform state against a live AWS account: reports Drift on managed resources, finds Unmanaged and Idle resources, and estimates what they cost in $/mo and kgCO₂/mo. AWS only, read-only, no backend.
 
+See what it does and what using it looks like in the interactive demo: [docs/demo.html](docs/demo.html) (download and open it in a browser).
+
 Sample output from a real scan of the [sandbox](sandbox/) after `make-mess.sh`: [docs/sample-output.txt](docs/sample-output.txt).
 
 ## Install
