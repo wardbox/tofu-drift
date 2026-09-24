@@ -4,8 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light dark">
-<title>tofu-drift: drift, unmanaged and idle AWS resources, with cost and carbon</title>
-<meta name="description" content="tofu-drift reports drift on OpenTofu/Terraform-managed AWS resources and finds unmanaged and idle ones, with $/mo and kgCO₂/mo estimates. AWS only, read-only, no backend.">
+<title>tofu-drift: find drift and stray stuff in your aws account</title>
+<meta name="description" content="tells you what changed in aws outside of tofu, and what's running with no state behind it, with a rough $/mo and kgCO₂/mo on each. read-only, no backend.">
 <style>
 :root {
   --bg: #f3f5f7; --surface: #fff; --ink: #16202a; --muted: #4f5d6a; --line: #d3dae0;
@@ -125,57 +125,57 @@ footer a { color: var(--ink); }
 
 <header class="wrap">
   <h1 class="mark"><span aria-hidden="true" class="ghost">tofu-drift</span>tofu-drift</h1>
-  <p class="pitch">Find what changed behind your OpenTofu state’s back, and what’s running in AWS that no state knows about.</p>
-  <p class="prose muted">Reports Drift on OpenTofu/Terraform-managed AWS resources, plus Unmanaged and Idle resources with a $/mo and kgCO₂/mo estimate on each. AWS only, read-only, no backend.</p>
+  <p class="pitch">tells you what changed in aws outside of tofu, and what’s running in your account with no state behind it.</p>
+  <p class="prose muted">aws only. read-only, no backend, nothing to host. every stray resource gets a rough $/mo and kgCO₂/mo so you know what to kill first. works with opentofu and terraform state.</p>
   <div class="install">
     <pre id="install-cmd">brew install wardbox/tap/tofu-drift</pre>
-    <button class="copy" type="button" data-copy="install-cmd" hidden>Copy</button>
+    <button class="copy" type="button" data-copy="install-cmd" hidden>copy</button>
   </div>
-  <p class="hint">Or <code>go install github.com/wardbox/tofu-drift/cmd/tofu-drift@latest</code>, or a binary from the <a href="https://github.com/wardbox/tofu-drift/releases">releases page</a>.</p>
+  <p class="hint">or <code>go install github.com/wardbox/tofu-drift/cmd/tofu-drift@latest</code>, or grab a binary from <a href="https://github.com/wardbox/tofu-drift/releases">releases</a>.</p>
 </header>
 
 <main>
 <section aria-labelledby="how">
   <div class="wrap">
-    <h2 id="how">How it works</h2>
-    <p class="prose muted">One Scan reads one state, one AWS account and one region. Nothing is written, locked or sent anywhere.</p>
-    <div class="flow" role="img" aria-label="Two inputs, your state and live AWS, are compared three ways. A refresh-only tofu plan gives Drift. AWS resources with no match in state are Unmanaged. Resources that are provably unused are Idle. Unmanaged and Idle get a monthly cost and carbon estimate. All three go into one report.">
+    <h2 id="how">how it works</h2>
+    <p class="prose muted">one scan looks at one state, one aws account and one region. it never writes, locks or sends anything.</p>
+    <div class="flow" role="img" aria-label="your state and live aws get compared three ways. a refresh-only tofu plan finds drift, lookups by id find unmanaged resources, usage rules find idle ones. unmanaged and idle rows get a monthly cost and carbon estimate. everything lands in one report.">
       <div class="col">
-        <span class="col-h">1 · Read</span>
-        <div class="node"><b>Your state</b><small>what OpenTofu manages: <code>tofu state pull</code>, a file, or <code>s3://</code></small></div>
-        <div class="node"><b>Live AWS</b><small>what actually exists: list and describe calls across 25 resource types, read-only</small></div>
+        <span class="col-h">1 · read</span>
+        <div class="node"><b>your state</b><small>what tofu thinks exists. from <code>tofu state pull</code>, a file, or <code>s3://</code></small></div>
+        <div class="node"><b>live aws</b><small>what exists right now. list and describe calls on 25 resource types</small></div>
       </div>
       <div class="arrow" aria-hidden="true">→</div>
       <div class="col">
-        <span class="col-h">2 · Compare</span>
-        <div class="node"><b>Three checks</b>
+        <span class="col-h">2 · compare</span>
+        <div class="node"><b>three checks</b>
           <ol>
-            <li><strong>Changed?</strong> <code>tofu plan -refresh-only</code> diffs managed resources against AWS (inside a root module).</li>
-            <li><strong>In state?</strong> each AWS resource is looked up by its Match Key (instance ID, bucket name, ARN…).</li>
-            <li><strong>Used?</strong> unattached volume, unassociated Elastic IP, load balancer with zero targets, stopped database…</li>
+            <li><strong>changed?</strong> <code>tofu plan -refresh-only</code> diffs your managed stuff against aws. needs a root module</li>
+            <li><strong>in state?</strong> every aws resource gets looked up by id, bucket name or arn</li>
+            <li><strong>used?</strong> unattached volume, loose elastic ip, load balancer with no targets, stopped database</li>
           </ol>
-          <small>Children like an instance's root volume fold into their parent.</small>
+          <small>stuff one resource made for itself, like an instance's root volume, rolls up into the parent</small>
         </div>
       </div>
       <div class="arrow" aria-hidden="true">→</div>
       <div class="col">
-        <span class="col-h">3 · Find</span>
-        <div class="node out c-drift"><b>Drift</b><small>managed, but changed outside OpenTofu</small></div>
-        <div class="node out c-unmanaged"><b>Unmanaged</b><small>exists in AWS, in no state</small><br><span class="cost">+ $/mo · kgCO₂/mo</span></div>
-        <div class="node out c-idle"><b>Idle</b><small>costing money, doing nothing, managed or not</small><br><span class="cost">+ $/mo · kgCO₂/mo</span></div>
+        <span class="col-h">3 · find</span>
+        <div class="node out c-drift"><b>drift</b><small>tofu manages it, someone changed it anyway</small></div>
+        <div class="node out c-unmanaged"><b>unmanaged</b><small>in aws, in no state</small><br><span class="cost">+ $/mo · kgCO₂/mo</span></div>
+        <div class="node out c-idle"><b>idle</b><small>costs money, does nothing. managed or not</small><br><span class="cost">+ $/mo · kgCO₂/mo</span></div>
       </div>
     </div>
     <div class="report-row">
       <div class="arrow" aria-hidden="true">↓</div>
-      <div class="node"><b>One report</b><small>a table, <code>--json</code>, or <code>--explain &lt;id&gt;</code> for the working behind one row</small></div>
+      <div class="node"><b>one report</b><small>a table, <code>--json</code>, or <code>--explain &lt;id&gt;</code> to see the math on one row</small></div>
     </div>
   </div>
 </section>
 
 <section aria-labelledby="try">
   <div class="wrap">
-    <h2 id="try">What using it looks like</h2>
-    <p class="prose muted">Real output from a scan of the project’s throwaway sandbox stack in us-west-1, after a script planted drift and stray resources.</p>
+    <h2 id="try">what it looks like</h2>
+    <p class="prose muted">real output from our throwaway sandbox in us-west-1, after a script messed with it on purpose.</p>
     <div class="term">
       <div class="term-bar">
         <div role="tablist" aria-label="Commands">
@@ -185,7 +185,7 @@ footer a { color: var(--ink); }
           <button role="tab" type="button" id="t-xsg" aria-controls="p-xsg" aria-selected="false" tabindex="-1">explain drift</button>
           <button role="tab" type="button" id="t-imp" aria-controls="p-imp" aria-selected="false" tabindex="-1">import-gen</button>
         </div>
-        <div class="ctl"><button type="button" id="replay">Replay</button><button type="button" id="skip">Skip</button></div>
+        <div class="ctl"><button type="button" id="replay">replay</button><button type="button" id="skip">skip</button></div>
       </div>
 <div role="tabpanel" id="p-scan" aria-labelledby="t-scan"><pre tabindex="0"><span class="ps">$ </span><span class="cmd">tofu-drift scan</span><span class="caret"></span>
 <span class="res">Drift
@@ -246,51 +246,51 @@ import {
   id = "eipalloc-0a3d468d4f54332a3"
 }</span></pre></div>
     </div>
-    <p class="hint">Wide tables scroll sideways. The NAT gateway’s own Elastic IP is a Derived Resource, so it sits inside the NAT row’s $38.69 instead of getting a row. The security group’s drift is a port 22 rule added in the console.</p>
+    <p class="hint">wide tables scroll sideways. the NAT gateway’s elastic ip has no row of its own, its $3.65 is inside the NAT’s $38.69. the security group drift is a port 22 rule somebody added in the console.</p>
   </div>
 </section>
 
 <section aria-labelledby="means">
   <div class="wrap">
-    <h2 id="means">What each finding means</h2>
-    <p class="prose muted">Every row is one Finding for one resource. Its STATUS says which of these it carries.</p>
-    <h3>Three kinds of Finding</h3>
+    <h2 id="means">what the rows mean</h2>
+    <p class="prose muted">one row per resource. STATUS tells you which of these it hit.</p>
+    <h3>three kinds</h3>
     <div class="kinds">
       <article class="kind c-drift">
-        <h4>Drift</h4>
-        <p>A Managed Resource was changed outside OpenTofu: a console edit, a script, another tool. The provider reports it during a refresh-only plan; tofu-drift only renders it. Drift is never costed and never ignored.</p>
+        <h4>drift</h4>
+        <p>tofu manages it and something changed it anyway. a console edit, a script, some other tool. the aws provider finds it during a refresh-only plan and tofu-drift prints it. drift never gets a price and ignore rules won’t hide it.</p>
       </article>
       <article class="kind c-unmanaged">
-        <h4>Unmanaged</h4>
-        <p>A live AWS resource whose ID or ARN appears in no scanned state. Someone made it by hand, or its state was lost. <code>import-gen</code> writes the <code>import</code> blocks to adopt it.</p>
+        <h4>unmanaged</h4>
+        <p>exists in aws, no state has its id or arn. somebody clicked it into existence or the state got lost. <code>import-gen</code> writes the <code>import</code> blocks to bring it under tofu.</p>
       </article>
       <article class="kind c-idle">
-        <h4>Idle</h4>
-        <p>Provably unused by a structural rule, whether managed or not:</p>
+        <h4>idle</h4>
+        <p>unused by one of these rules, managed or not</p>
         <ul>
-          <li>EBS volume unattached</li>
-          <li>Elastic IP unassociated</li>
-          <li>network interface unattached</li>
-          <li>ALB/NLB whose target groups are all empty; classic LB with no instances</li>
-          <li>EBS snapshot whose source volume is gone</li>
-          <li>AMI no live instance was launched from</li>
-          <li>RDS instance stopped</li>
+          <li>ebs volume not attached to anything</li>
+          <li>elastic ip not associated</li>
+          <li>network interface not attached</li>
+          <li>alb/nlb with empty target groups, classic lb with no instances</li>
+          <li>ebs snapshot, source volume deleted</li>
+          <li>ami nobody launched an instance from</li>
+          <li>rds instance stopped</li>
         </ul>
       </article>
     </div>
-    <h3>What stays out of the report</h3>
+    <h3>what gets left out</h3>
     <div class="left">
       <div>
-        <h4>Default Furniture</h4>
-        <p>What AWS creates in every account or VPC without being asked: the default VPC and its subnets, each VPC’s default security group and main route table, service-linked IAM roles, the <code>default</code> ECS cluster. Hidden unless you pass <code>--include-defaults</code>.</p>
+        <h4>aws defaults</h4>
+        <p>stuff aws makes in every account or vpc without asking. the default vpc and its subnets, default security groups, main route tables, service-linked iam roles, the <code>default</code> ecs cluster. hidden unless you pass <code>--include-defaults</code>.</p>
       </div>
       <div>
-        <h4>Derived Resources</h4>
-        <p>Resources another resource created: an instance’s launch-time volumes, a NAT gateway’s Elastic IPs, an AMI’s snapshots, an Auto Scaling group’s instances. They never get a row. Their cost folds into the parent’s.</p>
+        <h4>child resources</h4>
+        <p>things another resource made for itself. an instance’s launch volumes, a NAT gateway’s elastic ips, an ami’s snapshots, an auto scaling group’s instances. no row of their own, the cost goes on the parent.</p>
       </div>
       <div>
-        <h4>Ignore Rules</h4>
-        <p>A <code>tofu-drift.toml</code> in the current directory drops matching Unmanaged and Idle rows by tag, type or ARN glob. Every field in one rule must match.</p>
+        <h4>ignore rules</h4>
+        <p>put a <code>tofu-drift.toml</code> where you run it to hide unmanaged and idle rows by tag, type or arn glob. a rule with more than one field needs all of them to match.</p>
 <pre>[[ignore]]
 tag = "ManagedBy=other"
 
@@ -306,28 +306,28 @@ arn = "arn:aws:iam::*:role/legacy-*"</pre>
 
 <section aria-labelledby="start">
   <div class="wrap">
-    <h2 id="start">Quick start</h2>
+    <h2 id="start">quick start</h2>
     <ol class="steps">
       <li>
-        <b>Run it inside an OpenTofu root module</b> for the full report. State comes from <code>tofu state pull</code>, so any backend and the current workspace work.
+        <b>run it in a tofu root module</b> for the full report. state comes from <code>tofu state pull</code>, so whatever backend and workspace you’re on works.
 <pre>cd path/to/root-module
 tofu-drift scan</pre>
       </li>
       <li>
-        <b>Or point it at a state from anywhere.</b> With <code>--state</code> there is no module to plan against, so Drift is skipped and you get Unmanaged and Idle only.
+        <b>or point it at a state file from anywhere.</b> with <code>--state</code> there’s no module to plan against, so no drift. you get unmanaged and idle only.
 <pre>tofu-drift scan --state s3://&lt;bucket&gt;/&lt;key&gt;
 tofu-drift scan --state terraform.tfstate</pre>
       </li>
       <li>
-        <b>Choose the account and region</b> with the usual AWS profile and region, or override them.
+        <b>pick the account and region.</b> it uses your normal aws profile and region unless you override them.
 <pre>tofu-drift scan --profile &lt;profile&gt; --region us-west-1</pre>
       </li>
       <li>
-        <b>Feed it to scripts or CI.</b> <code>--json</code> works on every command. Exit code is 0 with no Findings, 1 with any, 2 on error.
+        <b>use it in scripts or CI.</b> <code>--json</code> works on every command. exit code 0 means nothing found, 1 means something, 2 means it broke.
 <pre>tofu-drift scan --json &gt; report.json</pre>
       </li>
       <li>
-        <b>Grant read-only access.</b> <a href="https://github.com/wardbox/tofu-drift/blob/main/iam-policy.json"><code>iam-policy.json</code></a> lists every AWS action a scan calls. Run without credentials and tofu-drift prints it and exits 2.
+        <b>give it read-only access.</b> <a href="https://github.com/wardbox/tofu-drift/blob/main/iam-policy.json"><code>iam-policy.json</code></a> lists every aws call a scan makes. run it with no credentials and it prints the policy and exits 2.
       </li>
     </ol>
   </div>
@@ -337,11 +337,11 @@ tofu-drift scan --state terraform.tfstate</pre>
 <footer>
   <div class="wrap">
     <ul>
-      <li><a href="https://github.com/wardbox/tofu-drift">GitHub repository</a></li>
-      <li><a href="https://github.com/wardbox/tofu-drift#readme">README and coverage table</a></li>
-      <li><a href="https://www.cloudcarbonfootprint.org/docs/methodology">Cloud Carbon Footprint methodology</a></li>
+      <li><a href="https://github.com/wardbox/tofu-drift">github</a></li>
+      <li><a href="https://github.com/wardbox/tofu-drift#readme">readme and what it covers</a></li>
+      <li><a href="https://www.cloudcarbonfootprint.org/docs/methodology">cloud carbon footprint methodology</a></li>
     </ul>
-    <p>Every $/mo and kgCO₂/mo figure is an estimate for ranking, not billing. Carbon follows the Cloud Carbon Footprint methodology. Apache-2.0.</p>
+    <p>every $/mo and kgCO₂ number is an estimate for ranking stuff, not a bill. carbon uses the cloud carbon footprint method. apache-2.0.</p>
   </div>
 </footer>
 
@@ -402,7 +402,7 @@ tofu-drift scan --state terraform.tfstate</pre>
   if (navigator.clipboard) {
     copy.hidden = false;
     copy.addEventListener("click", () => navigator.clipboard.writeText(document.getElementById(copy.dataset.copy).textContent)
-      .then(() => { copy.textContent = "Copied"; setTimeout(() => copy.textContent = "Copy", 1500); }, () => {}));
+      .then(() => { copy.textContent = "copied"; setTimeout(() => copy.textContent = "copy", 1500); }, () => {}));
   }
 })();
 </script>
