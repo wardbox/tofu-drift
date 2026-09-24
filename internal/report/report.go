@@ -28,6 +28,10 @@ type Report struct {
 	Findings []Finding `json:"findings"`
 	Totals   Totals    `json:"totals"`
 
+	// Ignore, when set, drops the Unmanaged and Idle Finding of every live
+	// resource it matches (Ignore Rules). Drift is never ignored.
+	Ignore func(scan.LiveResource) bool `json:"-"`
+
 	managed match.Managed
 }
 
@@ -89,7 +93,7 @@ func (r *Report) AddLive(live []scan.LiveResource, now time.Time) {
 			continue
 		}
 		addr := r.managed.Lookup(l.Type, l.Key)
-		if addr != "" && l.Idle == "" {
+		if addr != "" && l.Idle == "" || r.Ignore != nil && r.Ignore(l) {
 			continue
 		}
 		f := Finding{
