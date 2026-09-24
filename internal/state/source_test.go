@@ -13,6 +13,14 @@ import (
 
 var v4, _ = os.ReadFile("testdata/v4.tfstate")
 
+func TestRunCommandStderrTail(t *testing.T) {
+	_, err := RunCommand(context.Background(), t.TempDir(), "sh", "-c", "for i in $(seq 1 25); do echo line$i >&2; done; exit 1")
+	if err == nil || strings.Contains(err.Error(), "line5\n") || !strings.Contains(err.Error(), "exit status 1: line6\n") ||
+		!strings.HasSuffix(err.Error(), "line25") {
+		t.Errorf("want last 20 stderr lines, got %v", err)
+	}
+}
+
 // stubSource returns a Source whose PATH holds only bins and whose runner
 // records the invocation and returns out.
 func stubSource(t *testing.T, tf bool, bins []string, out []byte) (*Source, *[]string) {

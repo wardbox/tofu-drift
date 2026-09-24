@@ -6,12 +6,15 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"slices"
 	"sort"
+	"strings"
 	"text/tabwriter"
 	"time"
 
 	"github.com/wardbox/tofu-drift/internal/carbon"
 	"github.com/wardbox/tofu-drift/internal/match"
+	"github.com/wardbox/tofu-drift/internal/plan"
 	"github.com/wardbox/tofu-drift/internal/pricing"
 	"github.com/wardbox/tofu-drift/internal/scan"
 	"github.com/wardbox/tofu-drift/internal/state"
@@ -52,6 +55,7 @@ type Finding struct {
 
 type Drift struct {
 	Changed []string `json:"changed"`
+	Deleted bool     `json:"deleted,omitempty"`
 }
 
 type Totals struct {
@@ -121,6 +125,21 @@ func (r *Report) AddLive(live []scan.LiveResource, now time.Time) {
 	})
 }
 
+// AddDrift records Drift Findings. Call after AddLive: a drifted resource
+// already reported as Idle gets its Drift on that Finding. Drift is never
+// costed and adds nothing to the totals.
+func (r *Report) AddDrift(drifts []plan.Drift) {
+	for _, d := range drifts {
+		drift := &Drift{Changed: d.Changed(), Deleted: d.Deleted}
+		i := slices.IndexFunc(r.Findings, func(f Finding) bool { return f.Address == d.Address })
+		if i >= 0 {
+			r.Findings[i].Drift = drift
+			continue
+		}
+		r.Findings = append(r.Findings, Finding{ID: d.Address, Address: d.Address, Type: d.Type, Drift: drift})
+	}
+}
+
 func (r *Report) WriteJSON(w io.Writer) error {
 	enc := json.NewEncoder(w)
 	enc.SetIndent("", "  ")
@@ -130,8 +149,16 @@ func (r *Report) WriteJSON(w io.Writer) error {
 func (r *Report) WriteTable(w io.Writer) error {
 	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
 	fmt.Fprint(tw, "Drift\nADDRESS\tTYPE\tCHANGED\n")
+	drifted := slices.DeleteFunc(slices.Clone(r.Findings), func(f Finding) bool { return f.Drift == nil })
+	slices.SortFunc(drifted, func(a, b Finding) int { return strings.Compare(a.Address, b.Address) })
+	for _, f := range drifted {
+		fmt.Fprintf(tw, "%s\t%s\t%s\n", f.Address, f.Type, f.Drift.summary())
+	}
 	fmt.Fprint(tw, "\nUnmanaged & idle\nTYPE\tID\tNAME\tSTATUS\tAGE\t$/MO\tkgCO₂/MO\n")
 	for _, f := range r.Findings {
+		if !f.Unmanaged && f.Idle == nil {
+			continue
+		}
 		usd := fmt.Sprintf("%.2f", f.USDMo)
 		if f.Approx {
 			usd = "≈" + usd
@@ -153,10 +180,20 @@ func (f Finding) status() string {
 		return "unmanaged+idle"
 	case f.Unmanaged:
 		return "unmanaged"
-	case f.Idle != nil:
-		return "idle"
 	}
-	return "drift"
+	return "idle"
+}
+
+// summary is the CHANGED cell: attribute count and the first few names.
+func (d *Drift) summary() string {
+	if d.Deleted {
+		return "deleted"
+	}
+	names := d.Changed
+	if len(names) > 3 {
+		names = append(names[:3:3], "…")
+	}
+	return fmt.Sprintf("%d (%s)", len(d.Changed), strings.Join(names, ", "))
 }
 
 func dash(s string) string {
