@@ -59,6 +59,7 @@ func TestScanTable(t *testing.T) {
 	stubScanners(t,
 		scan.LiveResource{Type: "aws_ebs_volume", Key: "vol-0aaa", Class: "gp3", SizeGB: 500}, // managed, in use
 		scan.LiveResource{Type: "aws_ebs_volume", Key: "vol-stray", Name: "scratch", Class: "gp3", SizeGB: 100, Idle: "unattached"},
+		scan.LiveResource{Type: "aws_instance", Key: "i-stray", Class: "t3.large"},
 	)
 	out, err := runScan(t, "--state", "../../internal/state/testdata/v4.tfstate")
 	if !errors.Is(err, errFindings) {
@@ -67,7 +68,8 @@ func TestScanTable(t *testing.T) {
 	if strings.Contains(out, "vol-0aaa") {
 		t.Errorf("managed in-use volume reported:\n%s", out)
 	}
-	for _, want := range []string{"vol-stray", "scratch", "unmanaged+idle", "8.00", "Unmanaged: $8/mo · Idle: $8/mo"} {
+	for _, want := range []string{"vol-stray", "scratch", "unmanaged+idle", "8.00",
+		"i-stray", "60.74", "1.3", "Unmanaged: $69/mo · Idle: $8/mo"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("output missing %q:\n%s", want, out)
 		}

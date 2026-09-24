@@ -36,16 +36,18 @@ type Scan struct {
 
 // Finding is one row: one resource carrying one or more of drift, unmanaged, idle.
 type Finding struct {
-	ID        string   `json:"id"`
-	Address   string   `json:"address"`
-	Type      string   `json:"type"`
-	Name      string   `json:"name"`
-	Drift     *Drift   `json:"drift"`
-	Unmanaged bool     `json:"unmanaged"`
-	Idle      *string  `json:"idle"`
-	USDMo     float64  `json:"usd_mo"`
-	KgCO2Mo   float64  `json:"kgco2_mo"`
-	AgeDays   *float64 `json:"age_days"`
+	ID        string  `json:"id"`
+	Address   string  `json:"address"`
+	Type      string  `json:"type"`
+	Name      string  `json:"name"`
+	Drift     *Drift  `json:"drift"`
+	Unmanaged bool    `json:"unmanaged"`
+	Idle      *string `json:"idle"`
+	USDMo     float64 `json:"usd_mo"`
+	// Approx marks a us-east-1 price used for a region without its own table.
+	Approx  bool     `json:"usd_mo_approx,omitempty"`
+	KgCO2Mo float64  `json:"kgco2_mo"`
+	AgeDays *float64 `json:"age_days"`
 }
 
 type Drift struct {
@@ -64,20 +66,42 @@ func New(scan Scan, managed []state.Resource) *Report {
 
 // AddLive turns live resources into Unmanaged and Idle Findings, costs them
 // for the scanned region, and keeps Findings sorted by cost descending.
+// Derived Resources are never rows; their cost rolls up into their parent.
 func (r *Report) AddLive(live []scan.LiveResource, now time.Time) {
+	parent := map[string]string{}
 	for _, l := range live {
+		for _, d := range l.Derived {
+			parent[d] = l.Key
+		}
+	}
+	usd, kg := map[string]float64{}, map[string]float64{}
+	for _, l := range live {
+		root := l.Key
+		for p, ok := parent[root]; ok; p, ok = parent[root] {
+			root = p
+		}
+		u, _ := pricing.Monthly(r.Scan.Region, l)
+		usd[root] += u
+		kg[root] += carbon.Monthly(r.Scan.Region, l)
+	}
+	for _, l := range live {
+		if _, derived := parent[l.Key]; derived {
+			continue
+		}
 		addr := r.managed.Lookup(l.Type, l.Key)
 		if addr != "" && l.Idle == "" {
 			continue
 		}
+		_, approx := pricing.Monthly(r.Scan.Region, l)
 		f := Finding{
 			ID:        l.Key,
 			Address:   addr,
 			Type:      l.Type,
 			Name:      l.Name,
 			Unmanaged: addr == "",
-			USDMo:     pricing.Monthly(r.Scan.Region, l),
-			KgCO2Mo:   carbon.Monthly(r.Scan.Region, l),
+			USDMo:     usd[l.Key],
+			Approx:    approx,
+			KgCO2Mo:   kg[l.Key],
 		}
 		if l.Idle != "" {
 			f.Idle = &l.Idle
@@ -113,8 +137,12 @@ func (r *Report) WriteTable(w io.Writer) error {
 	fmt.Fprint(tw, "Drift\nADDRESS\tTYPE\tCHANGED\n")
 	fmt.Fprint(tw, "\nUnmanaged & idle\nTYPE\tID\tNAME\tSTATUS\tAGE\t$/MO\tkgCO₂/MO\n")
 	for _, f := range r.Findings {
-		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%.2f\t%.1f\n",
-			f.Type, f.ID, dash(f.Name), f.status(), age(f.AgeDays), f.USDMo, f.KgCO2Mo)
+		usd := fmt.Sprintf("%.2f", f.USDMo)
+		if f.Approx {
+			usd = "≈" + usd
+		}
+		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\t%.1f\n",
+			f.Type, f.ID, dash(f.Name), f.status(), age(f.AgeDays), usd, f.KgCO2Mo)
 	}
 	if err := tw.Flush(); err != nil {
 		return err

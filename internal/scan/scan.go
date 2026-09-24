@@ -26,8 +26,12 @@ type LiveResource struct {
 	Created *time.Time
 	// Idle is the idle reason, empty when the resource is in use.
 	Idle string
+	// Derived are the Match Keys of Derived Resources folded into this one.
+	Derived []string
 
 	// Cost inputs.
 	Class  string // volume type, instance class, ...
 	SizeGB float64
+	// Stopped instances bill no compute.
+	Stopped bool
 }

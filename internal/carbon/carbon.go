@@ -6,6 +6,7 @@ import (
 	_ "embed"
 	"encoding/json"
 
+	"github.com/wardbox/tofu-drift/internal/pricing"
 	"github.com/wardbox/tofu-drift/internal/scan"
 )
 
@@ -13,10 +14,11 @@ import (
 var coefficientsJSON []byte
 
 var coef struct {
-	PUE            float64            `json:"pue"`
-	StorageWh      map[string]float64 `json:"storage_wh_per_tb_hour"`
-	EBSReplication float64            `json:"ebs_replication"`
-	Grid           map[string]float64 `json:"grid_kg_per_kwh"`
+	PUE            float64                    `json:"pue"`
+	ComputeWatts   struct{ Min, Max float64 } `json:"compute_watts_per_vcpu"`
+	StorageWh      map[string]float64         `json:"storage_wh_per_tb_hour"`
+	EBSReplication float64                    `json:"ebs_replication"`
+	Grid           map[string]float64         `json:"grid_kg_per_kwh"`
 }
 
 func init() {
@@ -44,6 +46,12 @@ func grid(region string) float64 {
 // Monthly is the kgCO₂/mo Estimate for r in region; 0 for plumbing types.
 func Monthly(region string, r scan.LiveResource) float64 {
 	switch r.Type {
+	case "aws_instance":
+		if r.Stopped {
+			return 0
+		}
+		watts := float64(pricing.VCPU(r.Class)) * (coef.ComputeWatts.Min + coef.ComputeWatts.Max) / 2
+		return watts * hoursPerMonth * coef.PUE / 1000 * grid(region)
 	case "aws_ebs_volume":
 		disk := "ssd"
 		switch r.Class {

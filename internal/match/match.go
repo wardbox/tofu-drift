@@ -8,6 +8,7 @@ import "github.com/wardbox/tofu-drift/internal/state"
 // attributes. Types absent here are ignored.
 var keyFor = map[string]func(attrs map[string]any) string{
 	"aws_ebs_volume": attr("id"),
+	"aws_instance":   attr("id"),
 }
 
 func attr(name string) func(map[string]any) string {

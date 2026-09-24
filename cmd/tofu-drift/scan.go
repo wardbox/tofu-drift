@@ -25,8 +25,10 @@ import (
 
 // newScanners builds the covered-service scanners for cfg's region. Swapped in tests.
 var newScanners = func(cfg aws.Config) []scan.Scanner {
+	client := ec2.NewFromConfig(cfg)
 	return []scan.Scanner{
-		scan.EBS{Client: ec2.NewFromConfig(cfg)},
+		scan.EBS{Client: client},
+		scan.EC2{Client: client},
 	}
 }
 
