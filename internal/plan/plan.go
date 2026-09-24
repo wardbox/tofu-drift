@@ -19,9 +19,6 @@ import (
 	"slices"
 )
 
-// ErrNoBinary means neither tofu nor terraform is on PATH.
-var ErrNoBinary = errors.New("neither tofu nor terraform found on PATH")
-
 // Drift is one resource changed out of band, as the provider reported it.
 type Drift struct {
 	Address string
@@ -65,7 +62,7 @@ func (r *Runner) Drift(ctx context.Context) ([]Drift, error) {
 		}
 		return Parse(bytes.NewReader(out))
 	}
-	return nil, ErrNoBinary
+	return nil, errors.New("neither tofu nor terraform found on PATH")
 }
 
 // Parse reads the resource_drift entries of `show -json` plan output.
@@ -109,18 +106,31 @@ func (d Drift) Changed() []string {
 		return nil
 	}
 	var names []string
-	for _, k := range slices.Sorted(maps.Keys(d.Before)) {
+	for k := range d.Before {
 		if !reflect.DeepEqual(d.Before[k], d.After[k]) {
 			names = append(names, k)
 		}
 	}
-	for _, k := range slices.Sorted(maps.Keys(d.After)) {
+	for k := range d.After {
 		if _, ok := d.Before[k]; !ok {
 			names = append(names, k)
 		}
 	}
 	slices.Sort(names)
 	return names
+}
+
+// sensitive reports whether attribute key is marked sensitive on either side,
+// so a value is never shown in cleartext next to its masked counterpart.
+func (d Drift) sensitive(key string) bool {
+	return marked(attrMarker(d.BeforeSensitive, key)) || marked(attrMarker(d.AfterSensitive, key))
+}
+
+func attrMarker(m any, key string) any {
+	if obj, ok := m.(map[string]any); ok {
+		return obj[key]
+	}
+	return m
 }
 
 // Explain writes the attribute-level before/after, masking sensitive values.
@@ -132,18 +142,15 @@ func (d Drift) Explain(w io.Writer) {
 	changed := d.Changed()
 	fmt.Fprintf(w, "%s (%s): %d attributes changed out of band\n", d.Address, d.Type, len(changed))
 	for _, k := range changed {
-		fmt.Fprintf(w, "  %s\n    - %s\n    + %s\n", k,
-			value(d.Before[k], d.BeforeSensitive, k), value(d.After[k], d.AfterSensitive, k))
+		before, after := "(sensitive)", "(sensitive)"
+		if !d.sensitive(k) {
+			before, after = jsonString(d.Before[k]), jsonString(d.After[k])
+		}
+		fmt.Fprintf(w, "  %s\n    - %s\n    + %s\n", k, before, after)
 	}
 }
 
-func value(v, sensitive any, key string) string {
-	if m, ok := sensitive.(map[string]any); ok {
-		sensitive = m[key]
-	}
-	if marked(sensitive) {
-		return "(sensitive)"
-	}
+func jsonString(v any) string {
 	b, _ := json.Marshal(v)
 	return string(b)
 }

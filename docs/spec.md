@@ -41,11 +41,13 @@ Every run ends with the footer line. First run with no credentials prints the re
 }
 ```
 
+A drifted Finding's `drift` is `{"changed": ["attr", ...]}`, plus `"deleted": true` when the resource was deleted out of band. Attribute values never appear in `--json`; `--explain` is the only place they are shown, with sensitive ones masked.
+
 **Cut from v0.1:** destroy-plan (liability), multi-state scanning, multi-region, HTTP state backend (`tofu state pull` covers it in-repo), CloudWatch-metric idleness, rightsizing/"oversized" detection, `--fail-on`, `--binary` override.
 
 ## 3. Technical Design
 
-**Managed drift (don't reimplement providers, see ADR-0001):** shell out to `tofu plan -refresh-only -json` (fall back to `terraform`, PATH lookup only) and parse the JSON stream — `resource_drift` entries carry before/after per resource. The provider does all diffing; we render. Drift runs only when cwd has `.tf` files, a binary exists, and no `--state` was passed; otherwise degrade to unmanaged/idle-only with a notice. Drift is never costed.
+**Managed drift (don't reimplement providers, see ADR-0001):** shell out to `tofu plan -refresh-only -lock=false -input=false -out=<tmp>` (fall back to `terraform`, PATH lookup only), then parse `tofu show -json <tmp>` — its `resource_drift` entries carry before/after per resource (the `plan -json` UI stream only names them). The provider does all diffing; we render. Drift runs only when cwd has `.tf` files, a binary exists, and no `--state` was passed; otherwise degrade to unmanaged/idle-only with a notice. Drift is never costed.
 
 **State reading:** parse state JSON schema v4 only. Sources: `tofu state pull` (in-repo, any backend, respects workspace), local file, `s3://bucket/key` via SDK. Extract per resource instance: type, address (including module path and index key), Match Key, tags. `mode: "data"` entries skipped. Never write state, never lock.
 

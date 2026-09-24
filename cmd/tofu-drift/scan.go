@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"maps"
@@ -138,10 +137,9 @@ func scanCmd() *cobra.Command {
 			if statePath != "" {
 				fmt.Fprintln(cmd.ErrOrStderr(), "notice: --state given, skipping drift detection (no root module to plan against)")
 			} else {
+				// state pull above already required .tf files and a binary.
 				drifts, err = (&plan.Runner{Dir: dir, LookPath: lookPath, Run: runTool}).Drift(ctx)
-				if errors.Is(err, plan.ErrNoBinary) {
-					fmt.Fprintf(cmd.ErrOrStderr(), "notice: %v, skipping drift detection\n", err)
-				} else if err != nil {
+				if err != nil {
 					return err
 				}
 			}

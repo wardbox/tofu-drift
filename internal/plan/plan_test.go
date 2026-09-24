@@ -68,6 +68,15 @@ func TestExplain(t *testing.T) {
 	if s := out.String(); s != "local_sensitive_file.s (local_sensitive_file): deleted out of band\n" {
 		t.Errorf("deleted explain: %q", s)
 	}
+
+	// marked on one side only: both sides masked
+	out.Reset()
+	Drift{Address: "x.y", Type: "x",
+		Before: map[string]any{"token": "old-secret"}, After: map[string]any{"token": "new-secret"},
+		BeforeSensitive: map[string]any{"token": true}, AfterSensitive: false}.Explain(&out)
+	if strings.Contains(out.String(), "secret") {
+		t.Errorf("one-sided sensitive leaked:\n%s", out.String())
+	}
 }
 
 func TestRunner(t *testing.T) {
@@ -111,7 +120,7 @@ func TestRunner(t *testing.T) {
 	}
 
 	r.LookPath = func(string) (string, error) { return "", errors.New("not found") }
-	if _, err := r.Drift(context.Background()); !errors.Is(err, ErrNoBinary) {
+	if _, err := r.Drift(context.Background()); err == nil || !strings.Contains(err.Error(), "neither tofu nor terraform") {
 		t.Errorf("no binary: %v", err)
 	}
 }
