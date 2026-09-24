@@ -22,15 +22,16 @@ type Source struct {
 	GetS3    func(ctx context.Context, bucket, key string) (io.ReadCloser, error)
 }
 
-// RunCommand runs bin in dir and returns its stdout, folding stderr into the
-// error on failure.
+// RunCommand runs bin in dir and returns its stdout, folding the last 20
+// lines of stderr into the error on failure.
 func RunCommand(ctx context.Context, dir, bin string, args ...string) ([]byte, error) {
 	cmd := exec.CommandContext(ctx, bin, args...)
 	cmd.Dir = dir
 	out, err := cmd.Output()
 	var ee *exec.ExitError
 	if errors.As(err, &ee) && len(ee.Stderr) > 0 {
-		err = fmt.Errorf("%w: %s", err, bytes.TrimSpace(ee.Stderr))
+		lines := bytes.Split(bytes.TrimSpace(ee.Stderr), []byte("\n"))
+		err = fmt.Errorf("%w: %s", err, bytes.Join(lines[max(0, len(lines)-20):], []byte("\n")))
 	}
 	return out, err
 }

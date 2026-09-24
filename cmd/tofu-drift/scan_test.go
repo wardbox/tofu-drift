@@ -5,6 +5,9 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -117,8 +120,72 @@ func TestScanLocationNotices(t *testing.T) {
 	}
 
 	_, stderr, err = runScanStderr(t, "", "--state", "../../internal/state/testdata/v4.tfstate")
-	if err != nil || stderr != "" {
-		t.Errorf("same region, unknown caller: want no notices, got err %v stderr %q", err, stderr)
+	if want := "notice: --state given, skipping drift detection (no root module to plan against)\n"; err != nil || stderr != want {
+		t.Errorf("same region, unknown caller: want only the drift notice, got err %v stderr %q", err, stderr)
+	}
+}
+
+// inModule runs the test in a root module whose tofu binary is faked: state
+// pull returns the v4 fixture, plan succeeds unless planErr is set, and show
+// returns the recorded plan.
+func inModule(t *testing.T, planErr error) {
+	t.Helper()
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "main.tf"), nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	stateJSON, _ := os.ReadFile("../../internal/state/testdata/v4.tfstate")
+	showJSON, _ := os.ReadFile("../../internal/plan/testdata/show.json")
+	origLook, origRun := lookPath, runTool
+	lookPath = func(name string) (string, error) {
+		if name == "tofu" {
+			return "/bin/tofu", nil
+		}
+		return "", exec.ErrNotFound
+	}
+	runTool = func(_ context.Context, _, _ string, args ...string) ([]byte, error) {
+		switch args[0] {
+		case "state":
+			return stateJSON, nil
+		case "plan":
+			return nil, planErr
+		}
+		return showJSON, nil
+	}
+	t.Cleanup(func() { lookPath, runTool = origLook, origRun })
+	t.Chdir(dir)
+}
+
+func TestScanDrift(t *testing.T) {
+	inModule(t, nil)
+	out, err := runScan(t)
+	if !errors.Is(err, errFindings) {
+		t.Fatalf("drift alone must exit 1, got %v", err)
+	}
+	for _, want := range []string{
+		"aws_db_instance.main    aws_db_instance       3 (instance_class, password, tags)",
+		"local_sensitive_file.s  local_sensitive_file  deleted",
+		"Unmanaged: $0/mo · Idle: $0/mo",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("output missing %q:\n%s", want, out)
+		}
+	}
+
+	out, err = runScan(t, "--explain", "aws_db_instance.main")
+	if !errors.Is(err, errFindings) || !strings.Contains(out, `+ "db.t3.large"`) || strings.Contains(out, "hunter") {
+		t.Errorf("explain: err %v\n%s", err, out)
+	}
+	if _, err := runScan(t, "--explain", "aws_instance.nope"); err == nil || errors.Is(err, errFindings) {
+		t.Errorf("explain unknown address must error, got %v", err)
+	}
+}
+
+func TestScanPlanFailure(t *testing.T) {
+	inModule(t, errors.New("exit status 1: Error: Backend initialization required"))
+	_, err := runScan(t)
+	if err == nil || errors.Is(err, errFindings) || !strings.Contains(err.Error(), "Backend initialization required") {
+		t.Errorf("plan failure must be an error carrying stderr, got %v", err)
 	}
 }
 

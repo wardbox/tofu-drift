@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"maps"
@@ -18,10 +19,17 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/sts"
 	"github.com/spf13/cobra"
 	"github.com/wardbox/tofu-drift/internal/match"
+	"github.com/wardbox/tofu-drift/internal/plan"
 	"github.com/wardbox/tofu-drift/internal/report"
 	"github.com/wardbox/tofu-drift/internal/scan"
 	"github.com/wardbox/tofu-drift/internal/state"
 	"golang.org/x/sync/errgroup"
+)
+
+// lookPath and runTool find and run the tofu/terraform binary. Swapped in tests.
+var (
+	lookPath = exec.LookPath
+	runTool  = state.RunCommand
 )
 
 // newScanners builds the covered-service scanners for cfg's region. Swapped in tests.
@@ -69,7 +77,7 @@ var callerAccount = func(ctx context.Context, cfg aws.Config) (string, error) {
 }
 
 func scanCmd() *cobra.Command {
-	var statePath, region, profile string
+	var statePath, region, profile, explain string
 	var asJSON, includeDefaults bool
 	cmd := &cobra.Command{
 		Use:   "scan",
@@ -93,8 +101,8 @@ func scanCmd() *cobra.Command {
 			}
 			src := &state.Source{
 				Dir:      dir,
-				LookPath: exec.LookPath,
-				Run:      state.RunCommand,
+				LookPath: lookPath,
+				Run:      runTool,
 				GetS3: func(ctx context.Context, bucket, key string) (io.ReadCloser, error) {
 					out, err := s3.NewFromConfig(cfg).GetObject(ctx, &s3.GetObjectInput{Bucket: &bucket, Key: &key})
 					if err != nil {
@@ -126,6 +134,26 @@ func scanCmd() *cobra.Command {
 				}
 			}
 
+			var drifts []plan.Drift
+			if statePath != "" {
+				fmt.Fprintln(cmd.ErrOrStderr(), "notice: --state given, skipping drift detection (no root module to plan against)")
+			} else {
+				drifts, err = (&plan.Runner{Dir: dir, LookPath: lookPath, Run: runTool}).Drift(ctx)
+				if errors.Is(err, plan.ErrNoBinary) {
+					fmt.Fprintf(cmd.ErrOrStderr(), "notice: %v, skipping drift detection\n", err)
+				} else if err != nil {
+					return err
+				}
+			}
+			if explain != "" {
+				i := slices.IndexFunc(drifts, func(d plan.Drift) bool { return d.Address == explain })
+				if i < 0 {
+					return fmt.Errorf("--explain %q: no Drift with that address", explain)
+				}
+				drifts[i].Explain(cmd.OutOrStdout())
+				return errFindings
+			}
+
 			live, err := listAll(ctx, newScanners(cfg))
 			if err != nil {
 				return err
@@ -135,6 +163,7 @@ func scanCmd() *cobra.Command {
 			}
 			r := report.New(meta, managed)
 			r.AddLive(live, time.Now())
+			r.AddDrift(drifts)
 			out := cmd.OutOrStdout()
 			if asJSON {
 				err = r.WriteJSON(out)
@@ -155,6 +184,7 @@ func scanCmd() *cobra.Command {
 	cmd.Flags().StringVar(&profile, "profile", "", "AWS shared config profile")
 	cmd.Flags().BoolVar(&includeDefaults, "include-defaults", false, "report Default Furniture: the default VPC and its subnets, main route tables, default security groups")
 	cmd.Flags().BoolVar(&asJSON, "json", false, "emit JSON instead of a table")
+	cmd.Flags().StringVar(&explain, "explain", "", "print the attribute-level before/after for the Drift at this resource address")
 	return cmd
 }
 
