@@ -35,3 +35,45 @@ func TestIndex(t *testing.T) {
 		t.Errorf("empty key must never match, got %q", got)
 	}
 }
+
+func TestIndexPlumbing(t *testing.T) {
+	idx := Index([]state.Resource{
+		{Address: "aws_vpc.app", Type: "aws_vpc", Attributes: map[string]any{"id": "vpc-1"}},
+		{Address: "aws_subnet.a", Type: "aws_subnet", Attributes: map[string]any{"id": "subnet-1"}},
+		{Address: "aws_route_table.a", Type: "aws_route_table", Attributes: map[string]any{"id": "rtb-1"}},
+		{Address: "aws_security_group.web", Type: "aws_security_group", Attributes: map[string]any{"id": "sg-1"}},
+		{Address: "aws_default_security_group.d", Type: "aws_default_security_group", Attributes: map[string]any{"id": "sg-d"}},
+		{Address: "aws_default_route_table.d", Type: "aws_default_route_table", Attributes: map[string]any{"id": "rtb-d"}},
+	})
+	for typ, want := range map[[2]string]string{
+		{"aws_vpc", "vpc-1"}:           "aws_vpc.app",
+		{"aws_subnet", "subnet-1"}:     "aws_subnet.a",
+		{"aws_route_table", "rtb-1"}:   "aws_route_table.a",
+		{"aws_security_group", "sg-1"}: "aws_security_group.web",
+		{"aws_security_group", "sg-d"}: "aws_default_security_group.d",
+		{"aws_route_table", "rtb-d"}:   "aws_default_route_table.d",
+	} {
+		if got := idx.Lookup(typ[0], typ[1]); got != want {
+			t.Errorf("%v: got %q, want %q", typ, got, want)
+		}
+	}
+}
+
+func TestFurniture(t *testing.T) {
+	for _, tc := range []struct {
+		r    scan.LiveResource
+		want bool
+	}{
+		{scan.LiveResource{Type: "aws_vpc", Default: true}, true},
+		{scan.LiveResource{Type: "aws_subnet", Default: true}, true},
+		{scan.LiveResource{Type: "aws_route_table", Default: true}, true},
+		{scan.LiveResource{Type: "aws_security_group", Default: true}, true},
+		{scan.LiveResource{Type: "aws_security_group"}, false},
+		// Default only means furniture for types in the table.
+		{scan.LiveResource{Type: "aws_ebs_volume", Default: true}, false},
+	} {
+		if got := Furniture(tc.r); got != tc.want {
+			t.Errorf("%+v: got %v, want %v", tc.r, got, tc.want)
+		}
+	}
+}

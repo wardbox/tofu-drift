@@ -1,5 +1,5 @@
 // Package match decides whether a live resource is in state, by Match Key
-// equality only.
+// equality only, and which live resources are Default Furniture.
 package match
 
 import (
@@ -10,8 +10,25 @@ import (
 // keyFor maps a state resource type to its Match Key, derived from state
 // attributes. Types absent here are ignored.
 var keyFor = map[string]func(attrs map[string]any) string{
-	"aws_ebs_volume": attr("id"),
-	"aws_instance":   attr("id"),
+	"aws_ebs_volume":             attr("id"),
+	"aws_instance":               attr("id"),
+	"aws_vpc":                    attr("id"),
+	"aws_subnet":                 attr("id"),
+	"aws_route_table":            attr("id"),
+	"aws_security_group":         attr("id"),
+	"aws_default_vpc":            attr("id"),
+	"aws_default_subnet":         attr("id"),
+	"aws_default_route_table":    attr("id"),
+	"aws_default_security_group": attr("id"),
+}
+
+// liveType maps state types that adopt AWS-made resources to the live type
+// they manage.
+var liveType = map[string]string{
+	"aws_default_vpc":            "aws_vpc",
+	"aws_default_subnet":         "aws_subnet",
+	"aws_default_route_table":    "aws_route_table",
+	"aws_default_security_group": "aws_security_group",
 }
 
 func attr(name string) func(map[string]any) string {
@@ -29,7 +46,11 @@ func Index(rs []state.Resource) Managed {
 	for _, r := range rs {
 		if f, ok := keyFor[r.Type]; ok {
 			if k := f(r.Attributes); k != "" {
-				m[key{r.Type, k}] = r.Address
+				typ := r.Type
+				if t, ok := liveType[typ]; ok {
+					typ = t
+				}
+				m[key{typ, k}] = r.Address
 			}
 		}
 	}
@@ -58,3 +79,21 @@ func Roots(live []scan.LiveResource) map[string]string {
 
 // Lookup returns the state address for a live resource, or "" if Unmanaged.
 func (m Managed) Lookup(typ, k string) string { return m[key{typ, k}] }
+
+// furniture decides, per live type, whether a resource is Default Furniture.
+// Types absent here never are.
+var furniture = map[string]func(scan.LiveResource) bool{
+	"aws_vpc":            isDefault,
+	"aws_subnet":         isDefault,
+	"aws_route_table":    isDefault,
+	"aws_security_group": isDefault,
+}
+
+func isDefault(r scan.LiveResource) bool { return r.Default }
+
+// Furniture reports whether r is Default Furniture, suppressed unless
+// --include-defaults.
+func Furniture(r scan.LiveResource) bool {
+	f, ok := furniture[r.Type]
+	return ok && f(r)
+}
