@@ -75,15 +75,15 @@ func (hangingScanner) List(ctx context.Context) ([]scan.LiveResource, error) {
 	<-ctx.Done()
 	return nil, ctx.Err()
 }
-func (hangingScanner) Permissions() []string { return nil }
+func (hangingScanner) Permissions() []string { return []string{"ec2:DescribeSlowly"} }
 
 // stubScannerList makes the scan run ss, each with a 10ms timeout.
 func stubScannerList(t *testing.T, ss ...scan.Scanner) {
 	t.Helper()
-	newScanners = func(aws.Config) []scan.Scanner { return ss }
+	stubbed(ss...)
 	origTimeout := scannerTimeout
 	scannerTimeout = 10 * time.Millisecond
-	t.Cleanup(func() { stubbed(nil); scannerTimeout = origTimeout })
+	t.Cleanup(func() { stubbed(fakeScanner(nil)); scannerTimeout = origTimeout })
 }
 
 func TestScanPartialFailure(t *testing.T) {
@@ -98,7 +98,7 @@ func TestScanPartialFailure(t *testing.T) {
 	}
 	for _, want := range []string{
 		"notice: skipped main.failingScanner (needs ec2:DescribeThings): api error UnauthorizedOperation",
-		"notice: skipped main.hangingScanner: timed out after 10ms",
+		"notice: skipped main.hangingScanner (needs ec2:DescribeSlowly): timed out after 10ms",
 	} {
 		if !strings.Contains(stderr, want) {
 			t.Errorf("stderr missing %q:\n%s", want, stderr)

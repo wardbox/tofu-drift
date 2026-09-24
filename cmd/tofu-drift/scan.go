@@ -71,14 +71,14 @@ func listAll(ctx context.Context, w io.Writer, scanners []scan.Scanner) ([]scan.
 			ctx, cancel := context.WithTimeout(ctx, scannerTimeout)
 			defer cancel()
 			rs, err := s.List(ctx)
-			switch {
-			case ctx.Err() == context.DeadlineExceeded:
-				notices[i] = fmt.Sprintf("notice: skipped %T: timed out after %s\n", s, scannerTimeout)
-			case err != nil:
-				notices[i] = fmt.Sprintf("notice: skipped %T (needs %s): %v\n", s, strings.Join(s.Permissions(), ", "), err)
-			default:
+			if err == nil {
 				results[i] = rs
+				return nil
 			}
+			if ctx.Err() == context.DeadlineExceeded {
+				err = fmt.Errorf("timed out after %s", scannerTimeout)
+			}
+			notices[i] = fmt.Sprintf("notice: skipped %T (needs %s): %v\n", s, strings.Join(s.Permissions(), ", "), err)
 			return nil
 		})
 	}
@@ -93,16 +93,13 @@ func listAll(ctx context.Context, w io.Writer, scanners []scan.Scanner) ([]scan.
 		}
 	}
 	if failed > 0 && failed == len(scanners) {
-		return nil, fmt.Errorf("every scanner failed, see notices above")
+		return nil, errors.New("every scanner failed, see notices above")
 	}
 	return all, nil
 }
 
 // retrieveCredentials fails when cfg has no usable AWS credentials. Swapped in tests.
 var retrieveCredentials = func(ctx context.Context, cfg aws.Config) error {
-	if cfg.Credentials == nil {
-		return errors.New("no credential provider configured")
-	}
 	_, err := cfg.Credentials.Retrieve(ctx)
 	return err
 }
@@ -136,7 +133,7 @@ func scanCmd() *cobra.Command {
 				return err
 			}
 			if err := retrieveCredentials(ctx, cfg); err != nil {
-				fmt.Fprintln(cmd.ErrOrStderr(), "tofu-drift needs read-only AWS credentials. Attach this IAM policy (iam-policy.json) to the role or user you scan with:")
+				fmt.Fprintln(cmd.ErrOrStderr(), "tofu-drift needs read-only AWS credentials. Attach this IAM policy (iam-policy.json) to the role or user you scan with (add s3:GetObject on the state object to read s3:// state):")
 				fmt.Fprint(cmd.OutOrStdout(), string(tofudrift.IAMPolicy))
 				return fmt.Errorf("no AWS credentials: %w", err)
 			}
