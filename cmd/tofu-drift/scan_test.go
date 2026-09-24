@@ -149,8 +149,8 @@ func TestScanDefaultFurniture(t *testing.T) {
 		t.Errorf("default SG must be hidden, stray SG shown:\n%s", out)
 	}
 
-	out, _ = runScan(t, "--state", "../../internal/state/testdata/v4.tfstate", "--include-defaults")
-	if !strings.Contains(out, "sg-default") {
+	out, err = runScan(t, "--state", "../../internal/state/testdata/v4.tfstate", "--include-defaults")
+	if !errors.Is(err, errFindings) || !strings.Contains(out, "sg-default") {
 		t.Errorf("--include-defaults must show the default SG:\n%s", out)
 	}
 }
