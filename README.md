@@ -26,6 +26,21 @@ If one service's calls are denied or take longer than 30 seconds, that service i
 
 Resources another resource creates are folded into their parent's row: an instance's launch-time volumes and network interface, a NAT gateway's Elastic IPs and network interface, an AMI's snapshots. Network interfaces AWS services manage for themselves (load balancers, Lambda, RDS, VPC endpoints) are skipped. Load-balancer processing (LCU) and NAT data charges are not estimated.
 
+## Ignore Rules
+
+A `tofu-drift.toml` in the current directory (or `--config <path>`) removes matching Unmanaged and Idle rows from the table, the totals and `--json`. Drift is never ignored. Every field set in one rule must match; a malformed file exits 2.
+
+```toml
+[[ignore]]
+tag = "ManagedBy=other"
+
+[[ignore]]
+type = "aws_s3_bucket"
+
+[[ignore]]
+arn = "arn:aws:iam::*:role/legacy-*"  # path.Match glob: * does not cross /
+```
+
 ## Estimates
 
 Every $/mo and kgCO₂/mo figure is an estimate, meant for ranking rather than billing.

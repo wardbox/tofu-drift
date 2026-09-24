@@ -21,6 +21,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/sts"
 	"github.com/spf13/cobra"
 	tofudrift "github.com/wardbox/tofu-drift"
+	driftconfig "github.com/wardbox/tofu-drift/internal/config"
 	"github.com/wardbox/tofu-drift/internal/match"
 	"github.com/wardbox/tofu-drift/internal/plan"
 	"github.com/wardbox/tofu-drift/internal/report"
@@ -114,13 +115,17 @@ var callerAccount = func(ctx context.Context, cfg aws.Config) (string, error) {
 }
 
 func scanCmd() *cobra.Command {
-	var statePath, region, profile, explain string
+	var statePath, region, profile, explain, configPath string
 	var asJSON, includeDefaults bool
 	cmd := &cobra.Command{
 		Use:   "scan",
 		Short: "Report drift, unmanaged and idle resources",
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			ctx := cmd.Context()
+			conf, err := driftconfig.Load(configPath, cmd.Flags().Changed("config"))
+			if err != nil {
+				return err
+			}
 			var opts []func(*config.LoadOptions) error
 			if region != "" {
 				opts = append(opts, config.WithRegion(region))
@@ -203,6 +208,7 @@ func scanCmd() *cobra.Command {
 				live = slices.DeleteFunc(live, match.Furniture)
 			}
 			r := report.New(meta, managed)
+			r.Ignore = conf.Ignored
 			r.AddLive(live, time.Now())
 			r.AddDrift(drifts)
 			out := cmd.OutOrStdout()
@@ -224,6 +230,7 @@ func scanCmd() *cobra.Command {
 	cmd.Flags().StringVar(&region, "region", "", "AWS region to scan (default: from environment or profile)")
 	cmd.Flags().StringVar(&profile, "profile", "", "AWS shared config profile")
 	cmd.Flags().BoolVar(&includeDefaults, "include-defaults", false, "report Default Furniture: the default VPC and its subnets, main route tables, default security groups")
+	cmd.Flags().StringVar(&configPath, "config", "tofu-drift.toml", "config file with Ignore Rules (optional unless given)")
 	cmd.Flags().BoolVar(&asJSON, "json", false, "emit JSON instead of a table")
 	cmd.Flags().StringVar(&explain, "explain", "", "print the attribute-level before/after for the Drift at this resource address")
 	return cmd

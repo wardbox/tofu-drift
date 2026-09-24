@@ -209,6 +209,47 @@ func TestScanErrors(t *testing.T) {
 	}
 }
 
+func TestScanIgnoreRules(t *testing.T) {
+	stubScanners(t,
+		scan.LiveResource{Type: "aws_ebs_volume", Key: "vol-other", Class: "gp3", SizeGB: 100, Idle: "unattached",
+			Tags: map[string]string{"ManagedBy": "other"}},
+		scan.LiveResource{Type: "aws_instance", Key: "i-stray", Class: "t3.large"},
+	)
+	state, _ := filepath.Abs("../../internal/state/testdata/v4.tfstate")
+	dir := t.TempDir()
+	cfg := filepath.Join(dir, "custom.toml")
+	if err := os.WriteFile(cfg, []byte("[[ignore]]\ntag = \"ManagedBy=other\"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	out, err := runScan(t, "--state", state, "--json", "--config", cfg)
+	if !errors.Is(err, errFindings) {
+		t.Fatalf("want errFindings, got %v", err)
+	}
+	if strings.Contains(out, "vol-other") || !strings.Contains(out, "i-stray") || !strings.Contains(out, `"idle_usd_mo": 0`) {
+		t.Errorf("--config rule must drop vol-other from rows and totals:\n%s", out)
+	}
+
+	// tofu-drift.toml in cwd is read by default
+	t.Chdir(dir)
+	if err := os.WriteFile("tofu-drift.toml", []byte("[[ignore]]\ntype = \"aws_instance\"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	out, _ = runScan(t, "--state", state)
+	if strings.Contains(out, "i-stray") || !strings.Contains(out, "vol-other") {
+		t.Errorf("cwd tofu-drift.toml must drop i-stray:\n%s", out)
+	}
+
+	if err := os.WriteFile("tofu-drift.toml", []byte("[[ignore]\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := runScan(t, "--state", state); err == nil || errors.Is(err, errFindings) {
+		t.Errorf("malformed config must be an error (exit 2), got %v", err)
+	}
+	if _, err := runScan(t, "--state", state, "--config", filepath.Join(dir, "nope.toml")); err == nil || errors.Is(err, errFindings) {
+		t.Errorf("missing --config file must be an error, got %v", err)
+	}
+}
+
 func TestScanDefaultFurniture(t *testing.T) {
 	stubScanners(t,
 		scan.LiveResource{Type: "aws_security_group", Key: "sg-default", Default: true},

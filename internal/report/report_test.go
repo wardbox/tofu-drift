@@ -70,6 +70,34 @@ Unmanaged: $12/mo · Idle: $9/mo · ~0.1 kgCO₂/mo (≈ 0.00 trans-Atlantic fli
 	}
 }
 
+func TestIgnoreRules(t *testing.T) {
+	r := New(Scan{Region: "us-east-1"}, []state.Resource{
+		{Address: "aws_ebs_volume.data", Type: "aws_ebs_volume", Attributes: map[string]any{"id": "vol-mi"}},
+	})
+	r.Ignore = func(l scan.LiveResource) bool { return l.Type == "aws_ebs_volume" }
+	r.AddLive([]scan.LiveResource{
+		{Type: "aws_ebs_volume", Key: "vol-mi", Class: "gp3", SizeGB: 10, Idle: "unattached"},
+		{Type: "aws_ebs_volume", Key: "vol-u", Class: "gp3", SizeGB: 50},
+		{Type: "aws_instance", Key: "i-u", Class: "t3.large"},
+	}, time.Now())
+	// the rule matches the drifted volume too, but Drift is never ignored
+	r.AddDrift([]plan.Drift{{Address: "aws_ebs_volume.data", Type: "aws_ebs_volume",
+		Before: map[string]any{"size": 10.0}, After: map[string]any{"size": 20.0}}})
+
+	if len(r.Findings) != 2 {
+		t.Fatalf("findings: %+v", r.Findings)
+	}
+	if i := r.Findings[0]; i.ID != "i-u" {
+		t.Errorf("unignored unmanaged instance: %+v", i)
+	}
+	if d := r.Findings[1]; d.Address != "aws_ebs_volume.data" || d.Drift == nil || d.Idle != nil {
+		t.Errorf("drift must survive, without the ignored idle: %+v", d)
+	}
+	if r.Totals.IdleUSDMo != 0 || math.Abs(r.Totals.UnmanagedUSDMo-r.Findings[0].USDMo) > 1e-9 {
+		t.Errorf("ignored rows must not count in totals: %+v", r.Totals)
+	}
+}
+
 func TestAddLiveFoldsDerived(t *testing.T) {
 	r := New(Scan{Region: "us-east-1"}, []state.Resource{
 		{Address: "aws_instance.app", Type: "aws_instance", Attributes: map[string]any{"id": "i-app"}},
