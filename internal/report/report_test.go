@@ -58,10 +58,10 @@ func TestAddLive(t *testing.T) {
 ADDRESS  TYPE  CHANGED
 
 Unmanaged & idle
-TYPE            ID      NAME     STATUS          AGE  $/MO  kgCO₂/MO
-aws_ebs_volume  vol-ui  scratch  unmanaged+idle  10d  8.00  0.1
-aws_ebs_volume  vol-u   -        unmanaged       -    4.00  0.0
-aws_ebs_volume  vol-mi  -        idle            -    0.80  0.0
+TYPE            ID      REGION     NAME     STATUS          AGE  $/MO  kgCO₂/MO  NOTE
+aws_ebs_volume  vol-ui  us-east-1  scratch  unmanaged+idle  10d  8.00  0.1       -
+aws_ebs_volume  vol-u   us-east-1  -        unmanaged       -    4.00  0.0       -
+aws_ebs_volume  vol-mi  us-east-1  -        idle            -    0.80  0.0       -
 
 Unmanaged: $12/mo · Idle: $9/mo · ~0.1 kgCO₂/mo (≈ 0.00 trans-Atlantic flights)
 `
@@ -121,6 +121,46 @@ func TestAddLiveFoldsDerived(t *testing.T) {
 	}
 	if off.ID != "i-off" || off.USDMo != 8 || off.KgCO2Mo == 0 {
 		t.Errorf("stopped instance: attached EBS only: %+v", off)
+	}
+}
+
+func TestAddLiveData(t *testing.T) {
+	r := New(Scan{Region: "us-east-1"}, nil)
+	r.AddLive([]scan.LiveResource{
+		// Same Match Key on different types: separate rows, separate costs.
+		{Type: "aws_db_instance", Key: "app", Class: "db.t3.micro", Derived: []string{"rds:app-1"}},
+		{Type: "aws_db_snapshot", Key: "rds:app-1", SizeGB: 20},
+		{Type: "aws_elasticache_cluster", Key: "app", Class: "cache.t3.micro", Nodes: 2},
+		{Type: "aws_db_instance", Key: "old", Class: "db.t3.micro", Stopped: true, Idle: "stopped"},
+		{Type: "aws_s3_bucket", Key: "logs", Region: "global", Note: "size unknown"},
+	}, time.Now())
+
+	var out bytes.Buffer
+	if err := r.WriteTable(&out); err != nil {
+		t.Fatal(err)
+	}
+	want := `Drift
+ADDRESS  TYPE  CHANGED
+
+Unmanaged & idle
+TYPE                     ID    REGION     NAME  STATUS          AGE  $/MO   kgCO₂/MO  NOTE
+aws_elasticache_cluster  app   us-east-1  -     unmanaged       -    24.82  2.7       -
+aws_db_instance          app   us-east-1  -     unmanaged       -    12.41  1.3       -
+aws_s3_bucket            logs  global     -     unmanaged       -    0.00   0.0       size unknown
+aws_db_instance          old   us-east-1  -     unmanaged+idle  -    0.00   0.0       -
+
+Unmanaged: $37/mo · Idle: $0/mo · ~4.0 kgCO₂/mo (≈ 0.01 trans-Atlantic flights)
+`
+	if out.String() != want {
+		t.Errorf("table:\n%s\nwant:\n%s", out.String(), want)
+	}
+	if s3 := r.Findings[2]; s3.Region != "global" || s3.Note != "size unknown" {
+		t.Errorf("s3: %+v", s3)
+	}
+	// --explain app shows the first row, with that row's own resource.
+	out.Reset()
+	if !r.Explain(&out, "app") || !strings.Contains(out.String(), "cost:     cache.t3.micro $0.017/h × 730 h × 2 nodes = $24.82/mo\n") {
+		t.Errorf("explain:\n%s", out.String())
 	}
 }
 
@@ -212,8 +252,8 @@ aws_instance.web     aws_instance    4 (a, b, c, …)
 aws_s3_bucket.logs   aws_s3_bucket   deleted
 
 Unmanaged & idle
-TYPE            ID      NAME  STATUS  AGE  $/MO  kgCO₂/MO
-aws_ebs_volume  vol-mi  -     idle    -    0.80  0.0
+TYPE            ID      REGION     NAME  STATUS  AGE  $/MO  kgCO₂/MO  NOTE
+aws_ebs_volume  vol-mi  us-east-1  -     idle    -    0.80  0.0       -
 
 Unmanaged: $0/mo · Idle: $1/mo · ~0.0 kgCO₂/mo (≈ 0.00 trans-Atlantic flights)
 `

@@ -5,6 +5,8 @@
       "Sid": "TofuDriftReadOnly",
       "Effect": "Allow",
       "Action": [
+        "dynamodb:DescribeTable",
+        "dynamodb:ListTables",
         "ec2:DescribeAddresses",
         "ec2:DescribeImages",
         "ec2:DescribeInstances",
@@ -16,9 +18,13 @@
         "ec2:DescribeSubnets",
         "ec2:DescribeVolumes",
         "ec2:DescribeVpcs",
+        "elasticache:DescribeCacheClusters",
         "elasticloadbalancing:DescribeLoadBalancers",
         "elasticloadbalancing:DescribeTargetGroups",
         "elasticloadbalancing:DescribeTargetHealth",
+        "rds:DescribeDBInstances",
+        "rds:DescribeDBSnapshots",
+        "s3:ListAllMyBuckets",
         "sts:GetCallerIdentity"
       ],
       "Resource": "*"

@@ -44,11 +44,11 @@ func grid(region string) float64 {
 // Monthly is the kgCO₂/mo Estimate for r in region; 0 for plumbing types.
 func Monthly(region string, r scan.LiveResource) float64 {
 	switch r.Type {
-	case "aws_instance":
+	case "aws_instance", "aws_db_instance", "aws_elasticache_cluster", "aws_elasticache_replication_group":
 		if r.Stopped {
 			return 0
 		}
-		watts := float64(pricing.VCPU(r.Class)) * (coef.ComputeWatts.Min + coef.ComputeWatts.Max) / 2
+		watts := float64(pricing.VCPU(r.Class)*pricing.Nodes(r)) * (coef.ComputeWatts.Min + coef.ComputeWatts.Max) / 2
 		return watts * pricing.HoursPerMonth * coef.PUE / 1000 * grid(region)
 	case "aws_ebs_volume":
 		disk := "ssd"

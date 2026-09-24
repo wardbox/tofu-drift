@@ -92,6 +92,32 @@ func TestIndexFlatRate(t *testing.T) {
 	}
 }
 
+func TestIndexData(t *testing.T) {
+	idx := Index([]state.Resource{
+		// provider v5+: id is the resource id, identifier the name
+		{Address: "aws_db_instance.app", Type: "aws_db_instance", Attributes: map[string]any{"id": "db-ABC", "identifier": "app"}},
+		{Address: "aws_rds_cluster_instance.a", Type: "aws_rds_cluster_instance", Attributes: map[string]any{"id": "aurora-1", "identifier": "aurora-1"}},
+		{Address: "aws_db_snapshot.s", Type: "aws_db_snapshot", Attributes: map[string]any{"id": "before-upgrade", "db_snapshot_identifier": "before-upgrade"}},
+		{Address: "aws_dynamodb_table.t", Type: "aws_dynamodb_table", Attributes: map[string]any{"id": "users", "name": "users"}},
+		{Address: "aws_elasticache_cluster.c", Type: "aws_elasticache_cluster", Attributes: map[string]any{"id": "memo", "cluster_id": "memo"}},
+		{Address: "aws_elasticache_replication_group.g", Type: "aws_elasticache_replication_group", Attributes: map[string]any{"id": "sessions", "replication_group_id": "sessions"}},
+		{Address: "aws_s3_bucket.logs", Type: "aws_s3_bucket", Attributes: map[string]any{"id": "logs", "bucket": "logs"}},
+	})
+	for typ, want := range map[[2]string]string{
+		{"aws_db_instance", "app"}:                        "aws_db_instance.app",
+		{"aws_db_instance", "aurora-1"}:                   "aws_rds_cluster_instance.a",
+		{"aws_db_snapshot", "before-upgrade"}:             "aws_db_snapshot.s",
+		{"aws_dynamodb_table", "users"}:                   "aws_dynamodb_table.t",
+		{"aws_elasticache_cluster", "memo"}:               "aws_elasticache_cluster.c",
+		{"aws_elasticache_replication_group", "sessions"}: "aws_elasticache_replication_group.g",
+		{"aws_s3_bucket", "logs"}:                         "aws_s3_bucket.logs",
+	} {
+		if got := idx.Lookup(typ[0], typ[1]); got != want {
+			t.Errorf("%v: got %q, want %q", typ, got, want)
+		}
+	}
+}
+
 func TestFurniture(t *testing.T) {
 	for _, tc := range []struct {
 		r    scan.LiveResource
