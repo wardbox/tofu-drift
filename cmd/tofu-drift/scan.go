@@ -17,6 +17,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
 	"github.com/spf13/cobra"
+	"github.com/wardbox/tofu-drift/internal/match"
 	"github.com/wardbox/tofu-drift/internal/report"
 	"github.com/wardbox/tofu-drift/internal/scan"
 	"github.com/wardbox/tofu-drift/internal/state"
@@ -25,8 +26,13 @@ import (
 
 // newScanners builds the covered-service scanners for cfg's region. Swapped in tests.
 var newScanners = func(cfg aws.Config) []scan.Scanner {
+	client := ec2.NewFromConfig(cfg)
 	return []scan.Scanner{
-		scan.EBS{Client: ec2.NewFromConfig(cfg)},
+		scan.EBS{Client: client},
+		scan.VPCs{Client: client},
+		scan.Subnets{Client: client},
+		scan.RouteTables{Client: client},
+		scan.SecurityGroups{Client: client},
 	}
 }
 
@@ -63,7 +69,7 @@ var callerAccount = func(ctx context.Context, cfg aws.Config) (string, error) {
 
 func scanCmd() *cobra.Command {
 	var statePath, region, profile string
-	var asJSON bool
+	var asJSON, includeDefaults bool
 	cmd := &cobra.Command{
 		Use:   "scan",
 		Short: "Report drift, unmanaged and idle resources",
@@ -123,6 +129,9 @@ func scanCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
+			if !includeDefaults {
+				live = slices.DeleteFunc(live, match.Furniture)
+			}
 			r := report.New(meta, managed)
 			r.AddLive(live, time.Now())
 			out := cmd.OutOrStdout()
@@ -143,6 +152,7 @@ func scanCmd() *cobra.Command {
 	cmd.Flags().StringVar(&statePath, "state", "", "state file: local path or s3://bucket/key (default: tofu state pull in the current root module)")
 	cmd.Flags().StringVar(&region, "region", "", "AWS region to scan (default: from environment or profile)")
 	cmd.Flags().StringVar(&profile, "profile", "", "AWS shared config profile")
+	cmd.Flags().BoolVar(&includeDefaults, "include-defaults", false, "report Default Furniture: the default VPC and its subnets, main route tables, default security groups")
 	cmd.Flags().BoolVar(&asJSON, "json", false, "emit JSON instead of a table")
 	return cmd
 }
