@@ -212,11 +212,36 @@ func TestFurniture(t *testing.T) {
 		{scan.LiveResource{Type: "aws_security_group"}, false},
 		{scan.LiveResource{Type: "aws_ecs_cluster", Name: "default", Default: true}, true},
 		{scan.LiveResource{Type: "aws_ecs_cluster", Name: "app"}, false},
+		{scan.LiveResource{Type: "aws_iam_role", Default: true}, true},
+		{scan.LiveResource{Type: "aws_iam_role"}, false},
 		// Default only means furniture for types in the table.
 		{scan.LiveResource{Type: "aws_ebs_volume", Default: true}, false},
 	} {
 		if got := Furniture(tc.r); got != tc.want {
 			t.Errorf("%+v: got %v, want %v", tc.r, got, tc.want)
+		}
+	}
+}
+
+func TestIndexGlobal(t *testing.T) {
+	idx := Index([]state.Resource{
+		{Address: "aws_iam_role.app", Type: "aws_iam_role", Attributes: map[string]any{"id": "app", "name": "app"}},
+		{Address: "aws_iam_service_linked_role.es", Type: "aws_iam_service_linked_role", Attributes: map[string]any{"id": "arn:aws:iam::1:role/aws-service-role/es.amazonaws.com/AWSServiceRoleForAmazonOpenSearchService", "name": "AWSServiceRoleForAmazonOpenSearchService"}},
+		{Address: "aws_iam_user.ci", Type: "aws_iam_user", Attributes: map[string]any{"id": "ci", "name": "ci"}},
+		{Address: "aws_route53_zone.main", Type: "aws_route53_zone", Attributes: map[string]any{"id": "Z123", "zone_id": "Z123"}},
+		{Address: "aws_lambda_function.resize", Type: "aws_lambda_function", Attributes: map[string]any{"id": "resize", "function_name": "resize"}},
+		{Address: "aws_cloudwatch_log_group.app", Type: "aws_cloudwatch_log_group", Attributes: map[string]any{"id": "app", "name": "app"}},
+	})
+	for typ, want := range map[[2]string]string{
+		{"aws_iam_role", "app"}: "aws_iam_role.app",
+		{"aws_iam_role", "AWSServiceRoleForAmazonOpenSearchService"}: "aws_iam_service_linked_role.es",
+		{"aws_iam_user", "ci"}:              "aws_iam_user.ci",
+		{"aws_route53_zone", "Z123"}:        "aws_route53_zone.main",
+		{"aws_lambda_function", "resize"}:   "aws_lambda_function.resize",
+		{"aws_cloudwatch_log_group", "app"}: "aws_cloudwatch_log_group.app",
+	} {
+		if got := idx.Lookup(typ[0], typ[1]); got != want {
+			t.Errorf("%v: got %q, want %q", typ, got, want)
 		}
 	}
 }

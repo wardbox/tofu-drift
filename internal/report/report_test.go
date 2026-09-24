@@ -244,6 +244,50 @@ func TestAddLiveFlatRate(t *testing.T) {
 	}
 }
 
+func TestAddLiveLogGroups(t *testing.T) {
+	r := New(Scan{Region: "us-east-1"}, []state.Resource{
+		{Address: "aws_cloudwatch_log_group.app", Type: "aws_cloudwatch_log_group", Attributes: map[string]any{"name": "app"}},
+	})
+	r.AddLive([]scan.LiveResource{
+		// The function's log group folds into it: one row, the storage cost.
+		{Type: "aws_lambda_function", Key: "resize", Derived: []string{"/aws/lambda/resize"}},
+		{Type: "aws_cloudwatch_log_group", Key: "/aws/lambda/resize", SizeGB: 10, Note: "retention never"},
+		// Its function is gone: reported on its own.
+		{Type: "aws_cloudwatch_log_group", Key: "/aws/lambda/gone", SizeGB: 100, Note: "retention never"},
+		{Type: "aws_cloudwatch_log_group", Key: "app", SizeGB: 1, Note: "retention never"},
+	}, time.Now())
+
+	if len(r.Findings) != 2 {
+		t.Fatalf("findings: %+v", r.Findings)
+	}
+	gone, fn := r.Findings[0], r.Findings[1]
+	if gone.ID != "/aws/lambda/gone" || gone.USDMo != 3 || gone.Note != "retention never" || gone.KgCO2Mo == 0 {
+		t.Errorf("orphan log group: %+v", gone)
+	}
+	if fn.ID != "resize" || math.Abs(fn.USDMo-0.3) > 1e-9 || fn.Note != "" {
+		t.Errorf("function with its log group: %+v", fn)
+	}
+
+	var out bytes.Buffer
+	if err := r.WriteTable(&out); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out.String(), "NOTE\n") || !strings.Contains(out.String(), "3.00  0.0       retention never\n") {
+		t.Errorf("table missing NOTE:\n%s", out.String())
+	}
+
+	for id, want := range map[string]string{
+		"/aws/lambda/gone": "cost:     100 GB × $0.03/GB-mo = $3.00/mo\n          = $3.00/mo",
+		"resize": "cost:     requests and duration not estimated = $0.00/mo\n" +
+			"          + /aws/lambda/resize: 10 GB × $0.03/GB-mo = $0.30/mo\n          = $0.30/mo",
+	} {
+		out.Reset()
+		if !r.Explain(&out, id) || !strings.Contains(out.String(), want) {
+			t.Errorf("explain %s:\n%s\nwant:\n%s", id, out.String(), want)
+		}
+	}
+}
+
 func TestApproxMarked(t *testing.T) {
 	r := New(Scan{Region: "af-south-1"}, nil)
 	r.AddLive([]scan.LiveResource{{Type: "aws_instance", Key: "i-far", Class: "t3.large"}}, time.Now())

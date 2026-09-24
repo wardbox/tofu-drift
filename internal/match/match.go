@@ -51,6 +51,14 @@ var keyFor = map[string]func(attrs map[string]any) string{
 		}
 		return scan.ECSServiceKey(attr("cluster")(a), attr("name")(a))
 	},
+
+	// IAM, Route53, Lambda, CloudWatch Logs.
+	"aws_iam_role":                attr("name"),
+	"aws_iam_service_linked_role": attr("name"),
+	"aws_iam_user":                attr("name"),
+	"aws_route53_zone":            attr("zone_id"),
+	"aws_lambda_function":         attr("function_name"),
+	"aws_cloudwatch_log_group":    attr("name"),
 }
 
 // liveType maps state types that adopt AWS-made resources, or are aliases or
@@ -65,6 +73,8 @@ var liveType = map[string]string{
 	"aws_default_route_table":    "aws_route_table",
 	"aws_default_security_group": "aws_security_group",
 	"aws_rds_cluster_instance":   "aws_db_instance",
+
+	"aws_iam_service_linked_role": "aws_iam_role",
 }
 
 func attr(name string) func(map[string]any) string {
@@ -172,6 +182,7 @@ var furniture = map[string]func(scan.LiveResource) bool{
 	"aws_route_table":    isDefault,
 	"aws_security_group": isDefault,
 	"aws_ecs_cluster":    isDefault,
+	"aws_iam_role":       isDefault,
 }
 
 func isDefault(r scan.LiveResource) bool { return r.Default }

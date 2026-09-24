@@ -29,8 +29,13 @@
         "elasticloadbalancing:DescribeLoadBalancers",
         "elasticloadbalancing:DescribeTargetGroups",
         "elasticloadbalancing:DescribeTargetHealth",
+        "iam:ListRoles",
+        "iam:ListUsers",
+        "lambda:ListFunctions",
+        "logs:DescribeLogGroups",
         "rds:DescribeDBInstances",
         "rds:DescribeDBSnapshots",
+        "route53:ListHostedZones",
         "s3:ListAllMyBuckets",
         "sts:GetCallerIdentity"
       ],

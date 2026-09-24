@@ -91,6 +91,9 @@ func TestMonthlyFlat(t *testing.T) {
 		{"us-east-1", scan.LiveResource{Type: "aws_elb"}, 0.025 * 730},
 		{"us-east-1", scan.LiveResource{Type: "aws_ebs_snapshot", SizeGB: 100}, 5},
 		{"xx-nowhere-1", scan.LiveResource{Type: "aws_ebs_snapshot", SizeGB: 100}, 5},
+		{"us-east-1", scan.LiveResource{Type: "aws_cloudwatch_log_group", SizeGB: 100}, 3},
+		{"sa-east-1", scan.LiveResource{Type: "aws_cloudwatch_log_group", SizeGB: 100}, 4.08},
+		{"us-east-1", scan.LiveResource{Type: "aws_lambda_function"}, 0},
 		// ENIs are free; an AMI's cost is its Derived snapshots.
 		{"us-east-1", scan.LiveResource{Type: "aws_network_interface"}, 0},
 		{"us-east-1", scan.LiveResource{Type: "aws_ami"}, 0},
@@ -101,7 +104,7 @@ func TestMonthlyFlat(t *testing.T) {
 	}
 	// Every region seeded carries every flat rate.
 	for region, rates := range flat {
-		for _, k := range []string{"eip_hour", "nat_gateway_hour", "alb_hour", "nlb_hour", "clb_hour", "snapshot_gb_month"} {
+		for _, k := range []string{"eip_hour", "nat_gateway_hour", "alb_hour", "nlb_hour", "clb_hour", "snapshot_gb_month", "log_storage_gb_month"} {
 			if rates[k] <= 0 {
 				t.Errorf("%s: no %s", region, k)
 			}
@@ -127,6 +130,8 @@ func TestMath(t *testing.T) {
 		{"af-south-1", scan.LiveResource{Type: "aws_elasticache_replication_group", Class: "cache.t3.micro", Nodes: 3}, "cache.t3.micro $0.017/h × 730 h × 3 nodes = $37.23/mo (≈ us-east-1 price)"},
 		{"us-east-1", scan.LiveResource{Type: "aws_db_instance", Class: "db.t3.micro", Stopped: true}, "db.t3.micro stopped, no compute charge = $0.00/mo"},
 		{"us-east-1", scan.LiveResource{Type: "aws_s3_bucket"}, "size unknown = $0.00/mo"},
+		{"us-east-1", scan.LiveResource{Type: "aws_cloudwatch_log_group", SizeGB: 4.657}, "4.657 GB × $0.03/GB-mo = $0.14/mo"},
+		{"us-east-1", scan.LiveResource{Type: "aws_lambda_function"}, "requests and duration not estimated = $0.00/mo"},
 	} {
 		if got := Math(tc.region, tc.r); got != tc.want {
 			t.Errorf("%s %s: got %q, want %q", tc.region, tc.r.Type, got, tc.want)
