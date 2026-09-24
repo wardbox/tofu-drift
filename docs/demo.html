@@ -51,21 +51,25 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .copy:hover { color: var(--ink); }
 
 /* Flow */
-.flow { display: grid; grid-template-columns: repeat(5, auto); align-items: center; gap: .75rem .5rem; margin: 2rem 0 1rem; }
+.flow { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1.25fr) auto minmax(0, 1fr); align-items: center; gap: .75rem; margin: 2rem 0 0; }
+.col { display: flex; flex-direction: column; gap: .75rem; }
+.col-h { font: .75rem/1 var(--mono); text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
 .node { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: .7rem .85rem; font-size: .95rem; line-height: 1.4; }
 .node b { display: block; }
 .node small { color: var(--muted); font-size: .85rem; }
+.node ol { margin: .4rem 0 0; padding-left: 1.2rem; font-size: .85rem; color: var(--muted); }
+.node ol li + li { margin-top: .35rem; }
+.node ol strong { color: var(--ink); font-weight: 600; }
 .arrow { color: var(--muted); text-align: center; font-family: var(--mono); }
 .out { border-left: 3px solid var(--c); }
 .out b { color: var(--c); }
+.cost { display: inline-block; margin-top: .3rem; font: .75rem/1.4 var(--mono); color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 0 .5rem; }
 .c-drift { --c: var(--drift); } .c-unmanaged { --c: var(--unmanaged); } .c-idle { --c: var(--idle); }
-.merge { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; }
-.merge .node { flex: 1 1 12rem; }
+.report-row { display: grid; justify-items: center; gap: .5rem; margin: .75rem 0 1rem; }
+.report-row .node { width: 100%; box-sizing: border-box; text-align: center; }
 @media (max-width: 52rem) {
   .flow { grid-template-columns: minmax(0, 1fr); }
-  .arrow:not(.down) { transform: rotate(90deg); }
-  .merge { flex-direction: column; align-items: stretch; }
-  .merge .node { flex: none; }
+  .flow > .arrow { transform: rotate(90deg); }
 }
 
 /* Terminal */
@@ -135,25 +139,35 @@ footer a { color: var(--ink); }
   <div class="wrap">
     <h2 id="how">How it works</h2>
     <p class="prose muted">One Scan reads one state, one AWS account and one region. Nothing is written, locked or sent anywhere.</p>
-    <div class="flow" role="img" aria-label="State and a refresh-only tofu plan give Drift. Read-only AWS scanners are matched against state on Match Keys, giving Unmanaged and Idle resources; Derived Resources fold into their parent. Pricing and carbon estimates are added, then the report is written.">
-      <div class="node"><b>State</b><small><code>tofu state pull</code>, a file, or <code>s3://</code></small></div>
-      <div class="arrow" aria-hidden="true">→</div>
-      <div class="node"><b>Refresh-only plan</b><small><code>tofu plan -refresh-only</code>; the provider does the diffing</small></div>
-      <div class="arrow" aria-hidden="true">→</div>
-      <div class="node out c-drift"><b>Drift</b><small>out-of-band changes to Managed Resources</small></div>
-
-      <div class="node"><b>Read-only AWS scanners</b><small>25 resource types, list and describe calls only</small></div>
-      <div class="arrow" aria-hidden="true">→</div>
-      <div class="node"><b>Match on Match Keys</b><small>instance ID, bucket name, ARN… against state. Derived Resources fold into their parent.</small></div>
-      <div class="arrow" aria-hidden="true">→</div>
-      <div class="node out c-unmanaged"><b>Unmanaged</b><small>in AWS, in no state</small><br><b class="c-idle" style="color:var(--c)">Idle</b><small>provably unused, managed or not</small></div>
-
-      <div class="merge">
-        <div class="arrow down" aria-hidden="true">↓</div>
-        <div class="node"><b>Estimates</b><small>$/mo from pricing tables shipped in the binary; kgCO₂/mo by the Cloud Carbon Footprint method</small></div>
-        <div class="arrow" aria-hidden="true">→</div>
-        <div class="node"><b>Report</b><small>a table, <code>--json</code>, or <code>--explain</code> for one Finding</small></div>
+    <div class="flow" role="img" aria-label="Two inputs, your state and live AWS, are compared three ways. A refresh-only tofu plan gives Drift. AWS resources with no match in state are Unmanaged. Resources that are provably unused are Idle. Unmanaged and Idle get a monthly cost and carbon estimate. All three go into one report.">
+      <div class="col">
+        <span class="col-h">1 · Read</span>
+        <div class="node"><b>Your state</b><small>what OpenTofu manages: <code>tofu state pull</code>, a file, or <code>s3://</code></small></div>
+        <div class="node"><b>Live AWS</b><small>what actually exists: list and describe calls across 25 resource types, read-only</small></div>
       </div>
+      <div class="arrow" aria-hidden="true">→</div>
+      <div class="col">
+        <span class="col-h">2 · Compare</span>
+        <div class="node"><b>Three checks</b>
+          <ol>
+            <li><strong>Changed?</strong> <code>tofu plan -refresh-only</code> diffs managed resources against AWS (inside a root module).</li>
+            <li><strong>In state?</strong> each AWS resource is looked up by its Match Key (instance ID, bucket name, ARN…).</li>
+            <li><strong>Used?</strong> unattached volume, unassociated Elastic IP, load balancer with zero targets, stopped database…</li>
+          </ol>
+          <small>Children like an instance's root volume fold into their parent.</small>
+        </div>
+      </div>
+      <div class="arrow" aria-hidden="true">→</div>
+      <div class="col">
+        <span class="col-h">3 · Find</span>
+        <div class="node out c-drift"><b>Drift</b><small>managed, but changed outside OpenTofu</small></div>
+        <div class="node out c-unmanaged"><b>Unmanaged</b><small>exists in AWS, in no state</small><br><span class="cost">+ $/mo · kgCO₂/mo</span></div>
+        <div class="node out c-idle"><b>Idle</b><small>costing money, doing nothing, managed or not</small><br><span class="cost">+ $/mo · kgCO₂/mo</span></div>
+      </div>
+    </div>
+    <div class="report-row">
+      <div class="arrow" aria-hidden="true">↓</div>
+      <div class="node"><b>One report</b><small>a table, <code>--json</code>, or <code>--explain &lt;id&gt;</code> for the working behind one row</small></div>
     </div>
   </div>
 </section>
